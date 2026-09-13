@@ -110,7 +110,7 @@ function coverMarkup(work, extraClass = '') {
 
 function workCard(work, feature = false) {
   const tagHTML = work.types.slice(0, 3).map(type => `<span class="type-tag">${escapeHTML(type)}</span>`).join('');
-  const hotTag = work.votes > 4 ? '<span class="type-tag hot">热门</span>' : '<span class="type-tag">冷门</span>';
+  const hotTag = work.votes >= 4 ? '<span class="type-tag hot">热门</span>' : '<span class="type-tag">冷门</span>';
   if (feature) return `<article class="feature-card" data-open-work="${work.id}">
     ${coverMarkup(work)}
     <div class="feature-info"><strong>${escapeHTML(work.title)}</strong><div class="feature-meta"><span>${work.year} · ${escapeHTML(work.region)}</span><span class="rating">${formatRating(displayRating(work))}</span></div></div>

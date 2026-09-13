@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="罗瓣是一座把喜欢的动画、电影与故事放在一起的作品社区。" />
+    <meta name="theme-color" content="#0f4f47" />
+    <title>罗瓣 · 作品发现社区</title>
+    <link rel="icon" href="assets/logo.png" type="image/png" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="site-shell">
+      <header class="site-header">
+        <div class="header-inner">
+          <a class="brand" href="#home" aria-label="罗瓣首页">
+            <span class="brand-mark" aria-hidden="true"><img src="assets/logo-snail.png" alt="" /></span>
+            <span class="brand-copy"><strong>罗瓣</strong><small>喜欢的作品，慢慢聊</small></span>
+          </a>
+          <nav class="main-nav" aria-label="主导航">
+            <a class="nav-link is-active" href="#home" data-nav="home">发现</a>
+            <a class="nav-link" href="#profile" data-nav="profile">我的罗瓣</a>
+            <a class="nav-link" href="#create" data-nav="create">创建作品</a>
+          </nav>
+          <form class="header-search" id="headerSearch" role="search">
+            <span aria-hidden="true">⌕</span>
+            <input id="globalSearch" name="q" type="search" placeholder="搜索作品、类型或地区" autocomplete="off" />
+            <kbd>⌘ K</kbd>
+          </form>
+          <div class="header-user" id="headerUser"></div>
+        </div>
+      </header>
+
+      <main id="app" class="app-main" tabindex="-1"></main>
+
+      <footer class="site-footer">
+        <div class="footer-inner">
+          <div><span class="footer-logo">罗瓣</span><span class="footer-note">把喜欢的东西，留在同一页。</span></div>
+          <span class="footer-note">静态演示 · 数据保存在当前浏览器</span>
+        </div>
+      </footer>
+    </div>
+
+    <div class="modal-backdrop is-hidden" id="modalBackdrop" aria-hidden="true">
+      <section class="modal" id="authModal" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+        <button class="modal-close" type="button" data-close-modal aria-label="关闭">×</button>
+        <div class="modal-kicker">欢迎回到罗瓣</div>
+        <h2 id="authTitle">登录后，开始留下你的分数</h2>
+        <div class="auth-tabs" role="tablist">
+          <button class="auth-tab is-active" type="button" data-auth-tab="login">登录</button>
+          <button class="auth-tab" type="button" data-auth-tab="register">注册</button>
+        </div>
+        <form id="authForm" class="stack-form">
+          <label><span>英文用户名</span><input id="authUsername" name="username" required placeholder="例如 luoban_user" autocomplete="username" /></label>
+          <label><span>密码</span><input id="authPassword" name="password" type="password" required placeholder="输入密码" autocomplete="current-password" /></label>
+          <p class="form-hint" id="authHint">演示账号：demo / luoban</p>
+          <button class="button button-primary button-wide" type="submit" id="authSubmit">登录罗瓣</button>
+          <p class="form-error" id="authError" role="alert"></p>
+        </form>
+      </section>
+
+      <section class="modal is-hidden" id="workModal" role="dialog" aria-modal="true" aria-labelledby="workModalTitle">
+        <button class="modal-close" type="button" data-close-modal aria-label="关闭">×</button>
+        <div id="workModalContent"></div>
+      </section>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="app.js"></script>
+  </body>
+</html>

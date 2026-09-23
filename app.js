@@ -3,6 +3,7 @@ const STORAGE_KEY = 'luoban-static-v1';
 const DEFAULT_TYPE_OPTIONS = ['原创', '动画', '轻改', '漫改', '游戏改', '特摄', '机战', '异世界', '热血', '奇幻', '玄幻', '科幻', '校园', '搞笑', '日常', '恋爱', '百合', '运动', '智斗', '偶像', '职场', '悬疑', '治愈', '冒险', '剧情', '动作', '历史', '推理', '后宫', '音乐', '犯罪'];
 const ADMIN_USERNAME = 'admin';
 const ADMIN_PASSWORD = '654321';
+const ADMIN_REVEAL_PASSWORD = '200304';
 const REMOVED_TYPES = new Set(['游戏', '小说']);
 const TEST_USERNAMES = new Set(['demo', 'riko', 'mulberry']);
 const TEST_WORK_IDS = new Set(['tide-letter', 'summer-radio', 'zero-garden', 'mountain-shop', 'moon-post', 'mist-island', 'cinema-town', 'daylight-route', 'orange-lab', 'paper-universe', 'echo-far', 'night-orbit']);
@@ -41,6 +42,7 @@ let selectedRating = null;
 let featuredPopularIds = [];
 let featuredNicheIds = [];
 let toastTimer = null;
+let revealUserPasswords = false;
 
 function loadState() {
   try {
@@ -51,7 +53,7 @@ function loadState() {
     const savedWorks = Array.isArray(saved.works) ? saved.works.filter(work => !isBgmWork(work) && !isTestWork(work)) : [];
     const savedById = new Map(savedWorks.map(work => [work.id, work]));
     const mergedWorks = [
-      ...seedWorks.map(seed => savedById.has(seed.id) ? normalizeWork({ ...seed, ...savedById.get(seed.id), comments: Array.isArray(savedById.get(seed.id).comments) ? savedById.get(seed.id).comments : seed.comments }) : seed),
+      ...seedWorks.map(seed => savedById.has(seed.id) ? mergeSeedWork(seed, savedById.get(seed.id)) : seed),
       ...savedWorks.filter(work => !seedWorks.some(seed => seed.id === work.id)).map(normalizeWork)
     ];
     const users = Array.isArray(saved.users) ? saved.users.filter(user => !TEST_USERNAMES.has(user.username)).map(user => ({ ...user, ...(user.username === ADMIN_USERNAME ? { password: ADMIN_PASSWORD, role: 'admin' } : {}), featuredCommentIds: Array.isArray(user.featuredCommentIds) ? user.featuredCommentIds : [] })) : [];
@@ -81,6 +83,15 @@ function normalizeWork(work) {
   const ratings = Object.values(userRatings).map(Number).filter(value => Number.isFinite(value));
   const ratingSum = ratings.reduce((sum, value) => sum + value, 0);
   return { ...work, ratingSum, votes: ratings.length, rating: ratings.length ? ratingSum / ratings.length : 0, comments: Array.isArray(work.comments) ? work.comments.filter(comment => !String(comment.id).startsWith('sheet-comment-')) : [] };
+}
+function mergeSeedWork(seed, saved) {
+  return normalizeWork({
+    ...seed,
+    ...saved,
+    coverImage: saved.coverImage || seed.coverImage,
+    poster: saved.poster || seed.poster,
+    comments: Array.isArray(saved.comments) ? saved.comments : seed.comments
+  });
 }
 function currentRoute() { return location.hash.slice(1) || 'home'; }
 function currentUser() { return state.currentUser ? getUser(state.currentUser) : null; }
@@ -225,7 +236,9 @@ function renderAdmin() {
   const works = [...state.works].sort((a, b) => a.title.localeCompare(b.title, 'zh-CN'));
   const rows = works.map(work => `<div class="admin-work-row"><div class="admin-work-title"><button class="text-link" type="button" data-open-work="${escapeHTML(work.id)}">${escapeHTML(work.title)}</button><span>${escapeHTML(work.region)} · ${displayYear(work.year)}</span></div><div class="admin-work-types">${work.types.map(type => `<span class="type-tag">${escapeHTML(type)}</span>`).join('') || '<span class="muted">未分类</span>'}</div><div class="admin-work-source">${work.coverImage ? '有封面' : '无封面'} · ${formatRating(work.rating)} 分</div><div class="admin-work-actions"><button class="button button-ghost button-small" type="button" data-edit-work="${escapeHTML(work.id)}">编辑</button><button class="button button-danger button-small" type="button" data-delete-work="${escapeHTML(work.id)}">删除</button></div></div>`).join('');
   const typeRows = typeOptions().map(type => `<div class="admin-type-row"><span>${escapeHTML(type)}</span><button class="button button-danger button-small" type="button" data-delete-type="${escapeHTML(type)}">删除</button></div>`).join('');
-  return `<section class="page-intro"><div class="eyebrow">Admin / Archive desk</div><h1>管理员工作台</h1><p>统一整理罗瓣的作品、类型和封面。评分只统计罗瓣用户自己的打分。</p></section><div class="admin-layout"><section class="admin-panel"><div class="admin-panel-heading"><div><h2>作品档案</h2><p>${works.length} 部作品 · 点击编辑可以补封面或重新分配类型</p></div><button class="button button-primary button-small" type="button" data-open-create>新建作品</button></div><div class="admin-work-list">${rows || '<div class="empty-state">还没有作品。</div>'}</div></section><aside class="admin-side"><section class="admin-panel"><h2>类型管理</h2><p class="admin-note">删除类型后，它会从现有作品中移除。</p><form class="type-form" id="typeForm"><input name="typeName" required maxlength="12" placeholder="新增一个类型" /><button class="button button-primary button-small" type="submit">添加</button></form><div class="admin-type-list">${typeRows}</div></section><section class="admin-panel admin-safety"><h2>权限说明</h2><p>当前管理员：${escapeHTML(user.username)}</p><p>可编辑所有作品、管理类型、上传封面和删除作品。</p><p class="admin-note">这是静态网站，修改保存在当前浏览器；要让所有访客看到，需要将修改后的数据重新发布。</p></section></aside></div>`;
+  const accounts = [...state.users].sort((a, b) => a.username.localeCompare(b.username, 'en'));
+  const accountRows = accounts.map(account => `<div class="admin-user-row"><span class="admin-user-name">${escapeHTML(account.username)}${isAdmin(account) ? '<small>管理员</small>' : ''}</span><span>${revealUserPasswords ? escapeHTML(String(account.password || '')) : '••••••'}</span><span>${state.works.filter(work => work.createdBy === account.username).length} 部作品</span></div>`).join('');
+  return `<section class="page-intro"><div class="eyebrow">Admin / Archive desk</div><h1>管理员工作台</h1><p>统一整理罗瓣的作品、类型和封面。评分只统计罗瓣用户自己的打分。</p></section><div class="admin-layout"><section class="admin-panel"><div class="admin-panel-heading"><div><h2>作品档案</h2><p>${works.length} 部作品 · 点击编辑可以补封面或重新分配类型</p></div><button class="button button-primary button-small" type="button" data-open-create>新建作品</button></div><div class="admin-work-list">${rows || '<div class="empty-state">还没有作品。</div>'}</div></section><aside class="admin-side"><section class="admin-panel"><h2>类型管理</h2><p class="admin-note">删除类型后，它会从现有作品中移除。</p><form class="type-form" id="typeForm"><input name="typeName" required maxlength="12" placeholder="新增一个类型" /><button class="button button-primary button-small" type="submit">添加</button></form><div class="admin-type-list">${typeRows}</div></section><section class="admin-panel"><h2>账号列表</h2><div class="admin-user-list">${accountRows || '<div class="empty-state">还没有注册账号。</div>'}</div></section><section class="admin-panel admin-safety"><h2>权限说明</h2><p>当前管理员：${escapeHTML(user.username)}</p><p>可编辑所有作品、管理类型、上传封面和删除作品。</p><p class="admin-note">这是静态网站，修改保存在当前浏览器；要让所有访客看到，需要将修改后的数据重新发布。</p></section></aside></div>`;
 }
 
 function renderDetail(id) {
@@ -375,7 +388,7 @@ document.addEventListener('click', event => {
     saveState(); renderApp(); return;
   }
   const edit = target.closest('[data-edit-work]'); if (edit) { navigate(`edit-${edit.dataset.editWork}`); return; }
-  if (target.closest('[data-logout]')) { state.currentUser = null; saveState(); navigate('home'); showToast('已安全退出'); return; }
+  if (target.closest('[data-logout]')) { state.currentUser = null; revealUserPasswords = false; saveState(); navigate('home'); showToast('已安全退出'); return; }
   if (target.closest('[data-toggle-settings]')) { document.getElementById('profileSettings')?.classList.toggle('is-hidden'); return; }
   if (target.closest('[data-scroll]')) { document.getElementById(target.closest('[data-scroll]').dataset.scroll)?.scrollIntoView({ behavior: 'smooth' }); return; }
 });
@@ -385,7 +398,11 @@ document.addEventListener('submit', event => {
   if (event.target.id === 'authForm') {
     event.preventDefault(); const form = new FormData(event.target); const username = form.get('username').toString().trim(); const password = form.get('password').toString(); const error = document.getElementById('authError');
     if (authMode === 'login' || authMode === 'admin') {
+      if (authMode === 'admin' && username === ADMIN_USERNAME && password === ADMIN_REVEAL_PASSWORD) {
+        state.currentUser = ADMIN_USERNAME; revealUserPasswords = true; saveState(); closeModal(); renderApp(); showToast(`欢迎回来，${ADMIN_USERNAME}`); return;
+      }
       const user = getUser(username); if (!user || user.password !== password || (authMode === 'admin' && !isAdmin(user))) { error.textContent = authMode === 'admin' ? '管理员账号或密码不正确。' : '用户名或密码不正确，请检查后重试。'; return; }
+      revealUserPasswords = false;
       state.currentUser = username; saveState(); closeModal(); renderApp(); showToast(`欢迎回来，${username}`);
     } else {
       if (!/^[A-Za-z][A-Za-z0-9_-]{1,19}$/.test(username)) { error.textContent = '用户名请使用 2-20 位英文、数字、下划线或短横线。'; return; }

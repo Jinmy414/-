@@ -230,6 +230,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .type-form input:focus { border-color: #8bbba2; box-shadow: 0 0 0 2px #edf6f0; }
 .admin-type-list { display: grid; max-height: 330px; overflow: auto; border-top: 1px solid #f0f0f0; }
 .admin-type-row { display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: 7px 0; border-bottom: 1px solid #f0f0f0; color: #666; font-size: 12px; }
+.admin-user-list { display: grid; max-height: 260px; overflow: auto; border-top: 1px solid #f0f0f0; }
+.admin-user-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid #f0f0f0; color: #666; font-size: 12px; }
+.admin-user-name { display: flex; align-items: center; gap: 5px; min-width: 0; color: #333; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admin-user-name small { color: var(--teal); font-size: 10px; }
 .admin-safety p { margin: 7px 0 0; color: #777; font-size: 12px; line-height: 1.65; }
 .muted { color: #aaa; font-size: 11px; }
 

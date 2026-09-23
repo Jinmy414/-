@@ -56,9 +56,10 @@
         <form id="authForm" class="stack-form">
           <label><span>英文用户名</span><input id="authUsername" name="username" required placeholder="例如 luoban_user" autocomplete="username" /></label>
           <label><span>密码</span><input id="authPassword" name="password" type="password" required placeholder="输入密码" autocomplete="current-password" /></label>
-          <p class="form-hint" id="authHint">演示账号：demo / luoban</p>
+          <p class="form-hint" id="authHint">管理员请使用“管理员入口”；普通用户输入自己的账号。</p>
           <button class="button button-primary button-wide" type="submit" id="authSubmit">登录罗瓣</button>
           <p class="form-error" id="authError" role="alert"></p>
+          <button class="admin-entry-link" type="button" data-admin-entry>管理员入口</button>
         </form>
       </section>
 
@@ -69,7 +70,6 @@
     </div>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="assets/bangumi-works.js"></script>
     <script src="assets/animation-works.js"></script>
     <script src="assets/quotes.js"></script>
     <script src="app.js"></script>

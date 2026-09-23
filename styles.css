@@ -55,6 +55,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .login-link { border: 0; color: var(--blue); background: transparent; padding: 5px 0; font-size: 12px; }
 .login-link:hover, .text-link:hover { color: var(--green-deep); }
 .text-link { color: var(--blue); font-size: 12px; font-weight: 400; }
+.admin-link { color: var(--green-deep); font-size: 12px; font-weight: 700; }
+.admin-link:hover { color: var(--blue); }
 
 .app-main { width: min(1040px, calc(100% - 40px)); min-height: calc(100vh - 102px); margin: 0 auto; padding: 28px 0 62px; }
 .hero { display: grid; grid-template-columns: minmax(0, 1fr) 310px; gap: 40px; align-items: stretch; padding: 30px 32px 27px; margin-bottom: 34px; background: var(--paper); border-top: 3px solid var(--green); border-bottom: 1px solid var(--line); }
@@ -72,6 +74,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .button-ghost { color: var(--blue); background: white; border-color: #d8d8d8; }
 .button-ghost:hover { color: var(--green-deep); background: #f8fbf9; border-color: #a9cbb7; }
 .button-coral { color: #c86912; background: #fff7e7; border-color: #f2d29f; }
+.button-danger { color: #b44e47; background: #fff8f7; border-color: #e8c3bf; }
+.button-danger:hover { color: #fff; background: #c95247; border-color: #c95247; }
 .button-wide { width: 100%; }
 .button-small { min-height: 29px; padding: 5px 10px; font-size: 11px; }
 .hero-stats { display: flex; gap: 38px; flex-wrap: wrap; margin-top: 30px; padding-top: 17px; border-top: 1px solid var(--line); }
@@ -180,6 +184,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .comment-preview { padding: 13px 15px; background: white; border: 1px solid var(--line); }
 .comment-preview-top { display: flex; justify-content: space-between; gap: 8px; color: #999; font-size: 11px; }
 .comment-preview p { margin: 7px 0 0; color: #666; font-size: 13px; }
+.created-work-list { display: grid; gap: 8px; }
+.created-work-row { display: flex; justify-content: space-between; gap: 12px; padding: 11px 13px; border: 1px solid var(--line); color: var(--blue); background: white; text-align: left; font-size: 12px; }
+.created-work-row:hover { border-color: #a9cbb7; background: #f8fbf9; }
+.created-work-row span:last-child { color: #999; font-size: 11px; }
 
 .editor-shell { max-width: 850px; }
 .editor-card { padding: 24px 25px 25px; background: white; border: 1px solid var(--line); box-shadow: var(--shadow); }
@@ -194,11 +202,36 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .form-hint { color: #999; font-size: 11px; font-weight: 400; }
 .form-hint { margin: -1px 0 0; color: #999; font-size: 11px; font-weight: 400; }
 .form-error { min-height: 18px; margin: -2px 0 0; color: #c95247; font-size: 12px; }
+.admin-entry-link { justify-self: center; border: 0; padding: 2px 0; color: var(--green); background: transparent; font-size: 11px; }
+.admin-entry-link:hover { color: var(--green-deep); text-decoration: underline; }
 .form-actions { display: flex; align-items: center; justify-content: flex-end; gap: 9px; grid-column: 1 / -1; margin-top: 5px; padding-top: 16px; border-top: 1px solid var(--line); }
 .login-required { padding: 50px 20px; text-align: center; background: white; border: 1px solid var(--line); }
 .login-required .mini-symbol { color: var(--green); font-size: 32px; }
 .login-required h2 { margin: 8px 0 5px; color: #333; font-size: 20px; }
 .login-required p { margin: 0 0 18px; color: #999; font-size: 13px; }
+
+.admin-layout { display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 24px; align-items: start; }
+.admin-panel { padding: 20px; background: white; border: 1px solid var(--line); }
+.admin-panel h2 { margin: 0 0 5px; color: #333; font-size: 17px; }
+.admin-panel-heading { display: flex; align-items: start; justify-content: space-between; gap: 16px; padding-bottom: 15px; border-bottom: 1px solid var(--line); }
+.admin-panel-heading p, .admin-panel > p { margin: 0; color: #999; font-size: 11px; }
+.admin-work-list { display: grid; }
+.admin-work-row { display: grid; grid-template-columns: minmax(150px, 1.2fr) minmax(130px, 1fr) 100px auto; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid #f0f0f0; }
+.admin-work-row:last-child { border-bottom: 0; }
+.admin-work-title { min-width: 0; display: grid; gap: 2px; }
+.admin-work-title .text-link { overflow: hidden; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
+.admin-work-title > span, .admin-work-source { color: #999; font-size: 11px; }
+.admin-work-types { display: flex; gap: 4px; flex-wrap: wrap; }
+.admin-work-actions { display: flex; justify-content: end; gap: 5px; }
+.admin-side { display: grid; gap: 18px; }
+.admin-note { line-height: 1.7; }
+.type-form { display: flex; gap: 6px; margin: 14px 0; }
+.type-form input { min-width: 0; flex: 1; border: 1px solid #d9d9d9; padding: 7px 8px; outline: 0; font-size: 12px; }
+.type-form input:focus { border-color: #8bbba2; box-shadow: 0 0 0 2px #edf6f0; }
+.admin-type-list { display: grid; max-height: 330px; overflow: auto; border-top: 1px solid #f0f0f0; }
+.admin-type-row { display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: 7px 0; border-bottom: 1px solid #f0f0f0; color: #666; font-size: 12px; }
+.admin-safety p { margin: 7px 0 0; color: #777; font-size: 12px; line-height: 1.65; }
+.muted { color: #aaa; font-size: 11px; }
 
 .back-link { display: inline-flex; align-items: center; gap: 4px; margin-bottom: 15px; color: var(--blue); font-size: 12px; }
 .detail-hero { display: grid; grid-template-columns: 225px 1fr; gap: 30px; align-items: start; margin-bottom: 30px; padding-bottom: 27px; border-bottom: 1px solid var(--line-dark); }
@@ -284,6 +317,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .sort-bar { align-items: start; flex-direction: column; }
   .works-grid { grid-template-columns: repeat(2, 1fr); gap: 21px 12px; }
   .profile-layout, .detail-columns { grid-template-columns: 1fr; gap: 18px; }
+  .admin-layout { grid-template-columns: 1fr; }
+  .admin-work-row { grid-template-columns: 1fr auto; gap: 8px; }
+  .admin-work-types, .admin-work-source { grid-column: 1 / 2; }
+  .admin-work-actions { grid-column: 2 / 3; grid-row: 1 / span 2; align-self: center; }
   .profile-aside { padding: 18px; }
   .favorite-grid { gap: 8px; }
   .editor-grid { grid-template-columns: 1fr; }

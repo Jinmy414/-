@@ -17,33 +17,7 @@ const POSTER_OPTIONS = {
   ink: 'linear-gradient(145deg, #9ab1b2 0%, #4f6869 46%, #1e3036 100%)'
 };
 
-const RAW_SEED_WORKS = [...(window.LUOBAN_ANIMATION_WORKS || []).map(work => ({ ...work, rating: 0, votes: 0, ratingSum: 0, userRatings: {}, comments: [] })),
-  { id: 'tide-letter', title: '潮汐信使', year: 2024, region: '中国', types: ['原创', '奇幻', '恋爱'], rating: 9.1, votes: 28, ratingSum: 254.8, poster: POSTER_OPTIONS.mint, coverImage: '', summary: '一封寄往未来的信，让两个隔着潮汐的人在一座海边小城里相遇。', createdBy: 'demo', comments: [
-    { id: 'c1', user: 'riko', text: '海风、留白和配乐都刚刚好，最后一集看完很久没有说话。', likes: 32, date: '2026-08-21' },
-    { id: 'c2', user: 'demo', text: '喜欢它把奇幻写得很轻，像生活里突然亮了一盏灯。', likes: 18, date: '2026-08-23' }
-  ] },
-  { id: 'summer-radio', title: '夏日留声机', year: 2023, region: '日本', types: ['原创', '校园', '日常'], rating: 8.8, votes: 17, ratingSum: 149.6, poster: POSTER_OPTIONS.sky, coverImage: '', summary: '旧唱片店里播放的每一首歌，都对应着一段没有说完的青春。', createdBy: 'riko', comments: [
-    { id: 'c3', user: 'mulberry', text: '很适合夏天看的作品，细节多到想二刷。', likes: 21, date: '2026-07-15' }
-  ] },
-  { id: 'zero-garden', title: '零号花园', year: 2025, region: '欧美', types: ['科幻', '智斗', '原创'], rating: 9.3, votes: 36, ratingSum: 334.8, poster: POSTER_OPTIONS.ink, coverImage: '', summary: '城市的每个角落都长出了会记录记忆的植物，只有一座花园没有编号。', createdBy: 'demo', comments: [
-    { id: 'c4', user: 'riko', text: '概念很漂亮，而且没有为了反转牺牲人物。', likes: 27, date: '2026-08-30' }
-  ] },
-  { id: 'mountain-shop', title: '山海便利店', year: 2022, region: '中国', types: ['原创', '奇幻', '搞笑'], rating: 8.6, votes: 9, ratingSum: 77.4, poster: POSTER_OPTIONS.lemon, coverImage: '', summary: '凌晨两点以后，只有迷路的人和山里的精怪能找到这家店。', createdBy: 'mulberry', comments: [
-    { id: 'c5', user: 'demo', text: '每集都像一碗热汤，轻松但不空。', likes: 15, date: '2026-06-02' }
-  ] },
-  { id: 'moon-post', title: '月面邮局', year: 2021, region: '欧美', types: ['轻改', '科幻', '日常'], rating: 9.0, votes: 3, ratingSum: 27, poster: POSTER_OPTIONS.lavender, coverImage: '', summary: '月球背面有一家邮局，替人们投递那些来不及说出口的话。', createdBy: 'riko', comments: [
-    { id: 'c6', user: 'sora', text: '很温柔的一部，像在黑夜里收到一张明信片。', likes: 24, date: '2026-08-04' }
-  ] },
-  { id: 'mist-island', title: '雾岛来信', year: 2020, region: '日本', types: ['漫改', '恋爱', '悬疑'], rating: 8.7, votes: 2, ratingSum: 17.4, poster: POSTER_OPTIONS.dusk, coverImage: '', summary: '每年雾起时，岛上都会收到一封来自十年前的信。', createdBy: 'mulberry', comments: [
-    { id: 'c7', user: 'demo', text: '前半段像散文，后半段的情绪收得很漂亮。', likes: 13, date: '2026-05-12' }
-  ] },
-  { id: 'cinema-town', title: '小镇放映室', year: 2019, region: '中国', types: ['原创', '日常', '职场'], rating: 8.4, votes: 6, ratingSum: 50.4, poster: POSTER_OPTIONS.sky, coverImage: '', summary: '一家快要关门的电影院，和一群舍不得离开的观众。', createdBy: 'demo', comments: [] },
-  { id: 'daylight-route', title: '白昼航线', year: 2024, region: '欧美', types: ['原创', '热血', '运动'], rating: 8.9, votes: 12, ratingSum: 106.8, poster: POSTER_OPTIONS.mint, coverImage: '', summary: '一支临时组成的帆船队，决定穿过一片没有航线的海。', createdBy: 'riko', comments: [] },
-  { id: 'orange-lab', title: '橘子汽水研究所', year: 2018, region: '日本', types: ['游戏改', '校园', '搞笑'], rating: 8.1, votes: 3, ratingSum: 24.3, poster: POSTER_OPTIONS.lemon, coverImage: '', summary: '校园里最不靠谱的社团，认真研究着汽水、友情和夏天。', createdBy: 'mulberry', comments: [] },
-  { id: 'paper-universe', title: '纸上宇宙', year: 2016, region: '中国', types: ['原创', '玄幻', '智斗'], rating: 7.9, votes: 5, ratingSum: 39.5, poster: POSTER_OPTIONS.lavender, coverImage: '', summary: '画在纸上的星球开始运行，而画它的人被请去担任观测员。', createdBy: 'demo', comments: [] },
-  { id: 'echo-far', title: '远方的回声', year: 2014, region: '其他', types: ['特摄', '科幻', '热血'], rating: 7.6, votes: 4, ratingSum: 30.4, poster: POSTER_OPTIONS.ink, coverImage: '', summary: '一台只能接收未来信号的旧收音机，改变了四个人的选择。', createdBy: 'sora', comments: [] },
-  { id: 'night-orbit', title: '夜航轨道', year: 2011, region: '欧美', types: ['机战', '原创', '热血'], rating: 8.2, votes: 7, ratingSum: 57.4, poster: POSTER_OPTIONS.dusk, coverImage: '', summary: '在城市熄灯之后，夜航员们守护着一条看不见的轨道。', createdBy: 'riko', comments: [] }
-];
+const RAW_SEED_WORKS = (window.LUOBAN_ANIMATION_WORKS || []).map(work => ({ ...work, rating: 0, votes: 0, ratingSum: 0, userRatings: {}, comments: [] }));
 
 const SEED_WORKS = [...new Map(RAW_SEED_WORKS.map(work => [work.title.trim().toLowerCase(), work])).values()].filter(work => !TEST_WORK_IDS.has(work.id));
 
@@ -86,7 +60,7 @@ function loadState() {
       ...structuredClone(defaultState),
       ...saved,
       currentUser: users.some(user => user.username === saved.currentUser) ? saved.currentUser : null,
-      types: Array.isArray(saved.types) && saved.types.length ? [...new Set(saved.types.filter(type => type && !REMOVED_TYPES.has(type) && DEFAULT_TYPE_OPTIONS.includes(type)))] : [...DEFAULT_TYPE_OPTIONS],
+      types: Array.isArray(saved.types) && saved.types.length ? [...new Set(saved.types.filter(type => type && !REMOVED_TYPES.has(type)))] : [...DEFAULT_TYPE_OPTIONS],
       deletedWorkIds: [...deletedWorkIds],
       filters: { ...defaultState.filters, ...(saved.filters || {}), scoreMin: saved.filters?.scoreMin ?? saved.filters?.score ?? 0, scoreMax: saved.filters?.scoreMax ?? 10 },
       users,

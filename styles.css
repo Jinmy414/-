@@ -165,6 +165,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .type-list { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 5px; }
 .type-tag { padding: 1px 5px; color: #7a9c8a; background: #eef6f0; border-radius: 2px; font-size: 10px; }
 .type-tag.hot { color: #c77a21; background: #fff4df; }
+.type-tag.cold { color: #54758a; background: #edf4f8; }
 .empty-state { grid-column: 1 / -1; padding: 46px 20px; color: #999; text-align: center; border: 1px dashed #d4d4d4; background: white; }
 .empty-state strong { display: block; margin-bottom: 5px; color: #666; }
 

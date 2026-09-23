@@ -115,12 +115,16 @@ function mergeSeedWork(seed, saved) {
 function currentRoute() { return location.hash.slice(1) || 'home'; }
 function currentUser() { return state.currentUser ? getUser(state.currentUser) : null; }
 function isAdmin(user = currentUser()) { return Boolean(user && (user.role === 'admin' || user.username === 'admin' || user.username.toLowerCase() === 'jinmy414')); }
+function registeredUserCount() { return Math.max(1, state.users.filter(user => user.role !== 'admin' && user.username !== ADMIN_USERNAME).length); }
+function popularityThreshold() { return registeredUserCount() / 3; }
+function workRank(work) { const threshold = popularityThreshold(); if (work.votes > threshold) return 'hot'; if (work.votes < threshold) return 'cold'; return ''; }
+function popularityThresholdLabel() { const threshold = popularityThreshold(); return Number.isInteger(threshold) ? String(threshold) : threshold.toFixed(1); }
 function userInitial(username = '客') { return username.slice(0, 1).toUpperCase(); }
 function escapeHTML(value = '') { return String(value).replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char])); }
 function safeImage(value = '') { return /^https?:\/\//i.test(value) || /^data:image\/(?:png|jpe?g|gif|webp);base64,/i.test(value) ? value : ''; }
 function formatRating(value, votes = null) { return votes === 0 || value === null || value === undefined || value === '' ? '—' : Number(value).toFixed(1); }
 function displayYear(year) { return year ? String(year) : '年份待补'; }
-function displayRating(work) { if (!work.votes) return null; return state.sort === 'score' ? work.rating : Math.min(10, work.rating + (work.votes > 4 ? 1 : 0)); }
+function displayRating(work) { if (!work.votes) return null; return state.sort === 'score' ? work.rating : Math.min(10, work.rating + (workRank(work) === 'hot' ? 1 : 0)); }
 function yearBucket(year) {
   if (year <= 1989) return '80年代及以前';
   if (year <= 1999) return '90年代';
@@ -130,8 +134,8 @@ function yearBucket(year) {
 }
 function shuffle(items) { return [...items].sort(() => Math.random() - .5); }
 function refreshFeatured() {
-  const popular = state.works.filter(work => work.votes > 4 && work.rating > 8);
-  const niche = state.works.filter(work => work.votes <= 4 && work.rating > 8);
+  const popular = state.works.filter(work => workRank(work) === 'hot' && work.rating > 8);
+  const niche = state.works.filter(work => workRank(work) === 'cold' && work.rating > 8);
   featuredPopularIds = shuffle(popular).slice(0, 3).map(work => work.id);
   featuredNicheIds = shuffle(niche).slice(0, 3).map(work => work.id);
 }
@@ -147,14 +151,15 @@ function coverMarkup(work, extraClass = '') {
 
 function workCard(work, feature = false) {
   const tagHTML = work.types.slice(0, 3).map(type => `<span class="type-tag">${escapeHTML(type)}</span>`).join('');
-  const hotTag = work.votes >= 4 ? '<span class="type-tag hot">热门</span>' : '<span class="type-tag">冷门</span>';
+  const rank = workRank(work);
+  const rankTag = rank === 'hot' ? '<span class="type-tag hot">热门</span>' : rank === 'cold' ? '<span class="type-tag cold">冷门</span>' : '';
   if (feature) return `<article class="feature-card" data-open-work="${work.id}">
     ${coverMarkup(work)}
     <div class="feature-info"><strong>${escapeHTML(work.title)}</strong><div class="feature-meta"><span>${displayYear(work.year)} · ${escapeHTML(work.region)}</span><span class="rating">${formatRating(displayRating(work), work.votes)}</span></div></div>
   </article>`;
   return `<article class="work-card" data-open-work="${work.id}">
     ${coverMarkup(work)}
-    <div class="feature-info"><strong>${escapeHTML(work.title)}</strong><div class="feature-meta"><span>${displayYear(work.year)} · ${escapeHTML(work.region)}</span><span class="rating">${formatRating(displayRating(work), work.votes)}</span></div><div class="type-list">${tagHTML}${hotTag}</div></div>
+    <div class="feature-info"><strong>${escapeHTML(work.title)}</strong><div class="feature-meta"><span>${displayYear(work.year)} · ${escapeHTML(work.region)}</span><span class="rating">${formatRating(displayRating(work), work.votes)}</span></div><div class="type-list">${tagHTML}${rankTag}</div></div>
   </article>`;
 }
 
@@ -181,8 +186,8 @@ function renderHome() {
     <div class="hero-art quote-board"><span class="art-label">LUOBAN / 台词档案</span><div class="quote-logo"><img src="assets/logo-snail.png" alt="罗瓣 logo" /></div><div class="quote-list">${quoteMarkup}</div><span class="art-note">随机抽取 · ${quotes.length || 0} 条</span></div>
   </section>
   <section id="discover" class="discover-section"><div class="section-heading"><div><span class="section-index">01 / 今日记录</span><h2>先从一部作品开始</h2><p>每次打开，遇见 3 部热门高分和 3 部冷门高分作品。</p></div><span class="text-link section-date">随机漫游中 · ${new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })}</span></div>
-    <div class="split-heading"><h2>热门高分</h2><span class="tag">评分人数 &gt; 4</span><span class="line"></span></div><div class="feature-grid">${popular.length ? popular.map(work => workCard(work, true)).join('') : '<div class="empty-state">还没有足够的热门高分作品。</div>'}</div>
-    <div class="split-heading"><h2>冷门高分</h2><span class="tag">评分人数 ≤ 4</span><span class="line"></span></div><div class="feature-grid">${niche.length ? niche.map(work => workCard(work, true)).join('') : '<div class="empty-state">再留下几份评分，这里会长出新的推荐。</div>'}</div>
+    <div class="split-heading"><h2>热门高分</h2><span class="tag">评价人数 &gt; 注册账户数 / 3（当前 ${popularityThresholdLabel()}）</span><span class="line"></span></div><div class="feature-grid">${popular.length ? popular.map(work => workCard(work, true)).join('') : '<div class="empty-state">还没有足够的热门高分作品。</div>'}</div>
+    <div class="split-heading"><h2>冷门高分</h2><span class="tag">评价人数 &lt; 注册账户数 / 3（当前 ${popularityThresholdLabel()}）</span><span class="line"></span></div><div class="feature-grid">${niche.length ? niche.map(work => workCard(work, true)).join('') : '<div class="empty-state">再留下几份评分，这里会长出新的推荐。</div>'}</div>
   </section>
   <section class="works-section"><div class="section-heading"><div><span class="section-index">02 / 全部记录</span><h2>按你的方式找作品</h2><p>搜索标题、类型或地区，用标签收拢兴趣。</p></div></div>${renderFilters()}<div class="works-grid">${filtered.length ? filtered.map(work => workCard(work)).join('') : '<div class="empty-state"><strong>没有找到匹配的作品</strong>换个关键词或放宽筛选条件试试。<br /><button class="button button-ghost button-small" type="button" data-clear-filters>清除筛选</button></div>'}</div></section>`;
 }
@@ -209,7 +214,7 @@ function filteredWorks() {
     const typeMatch = !f.types.length || f.types.every(type => work.types.includes(type));
     const regionMatch = !f.regions.length || f.regions.every(region => work.region === region);
     const yearMatch = !f.years.length || f.years.every(year => String(work.year) === year || (work.year && yearBucket(work.year) === year));
-    const rankMatch = !f.rank || (f.rank === 'hot' ? work.votes > 4 : work.votes <= 4);
+    const rankMatch = !f.rank || workRank(work) === f.rank;
     const scoreMatch = work.rating >= Number(f.scoreMin ?? 0) && work.rating <= Number(f.scoreMax ?? 10);
     return (!query || searchable.includes(query)) && typeMatch && regionMatch && yearMatch && rankMatch && scoreMatch;
   });
@@ -274,7 +279,7 @@ function renderDetail(id) {
 }
 
 function autoTags(work) {
-  const tags = [work.votes >= 4 ? '热门' : '冷门', work.rating > 8 ? '高分' : '', work.rating < 4 ? '赤石' : ''].filter(Boolean);
+  const tags = [workRank(work) === 'hot' ? '热门' : workRank(work) === 'cold' ? '冷门' : '', work.rating > 8 ? '高分' : '', work.rating < 4 ? '赤石' : ''].filter(Boolean);
   return tags.length ? tags : ['待观察'];
 }
 
@@ -449,7 +454,7 @@ document.addEventListener('submit', event => {
       if (!/^\S{1,20}$/.test(username)) { error.textContent = '用户名请使用 1-20 个不含空格的字符。'; return; }
       if (getUser(username)) { error.textContent = '这个用户名已经被使用了。'; return; }
       if (!password) { error.textContent = '请输入密码。'; return; }
-      state.users.push({ username, password, favoriteIds: [] }); state.currentUser = username; saveState(); closeModal(); renderApp(); showToast('账号创建成功，欢迎来到罗瓣');
+      state.users.push({ username, password, favoriteIds: [] }); state.currentUser = username; refreshFeatured(); saveState(); closeModal(); renderApp(); showToast('账号创建成功，欢迎来到罗瓣');
     }
     return;
   }

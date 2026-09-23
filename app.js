@@ -4,6 +4,8 @@ const DEFAULT_TYPE_OPTIONS = ['原创', '动画', '轻改', '漫改', '游戏改
 const ADMIN_USERNAME = 'admin';
 const ADMIN_PASSWORD = '654321';
 const ADMIN_REVEAL_PASSWORD = '200304';
+const INITIAL_USER_PASSWORD = '000000';
+const IMPORTED_USERNAMES = ['罗', '硬', '金', '文', '鹏', '龙', '飞', '鲨', '任', '虎', '马'];
 const REMOVED_TYPES = new Set(['游戏', '小说']);
 const TEST_USERNAMES = new Set(['demo', 'riko', 'mulberry']);
 const TEST_WORK_IDS = new Set(['tide-letter', 'summer-radio', 'zero-garden', 'mountain-shop', 'moon-post', 'mist-island', 'cinema-town', 'daylight-route', 'orange-lab', 'paper-universe', 'echo-far', 'night-orbit']);
@@ -18,14 +20,22 @@ const POSTER_OPTIONS = {
   ink: 'linear-gradient(145deg, #9ab1b2 0%, #4f6869 46%, #1e3036 100%)'
 };
 
-const RAW_SEED_WORKS = (window.LUOBAN_ANIMATION_WORKS || []).map(work => ({ ...work, rating: 0, votes: 0, ratingSum: 0, userRatings: {}, comments: [] }));
+const RAW_SEED_WORKS = (window.LUOBAN_ANIMATION_WORKS || []).map(work => ({
+  ...work,
+  userRatings: work.userRatings && typeof work.userRatings === 'object' ? work.userRatings : {},
+  rating: Number.isFinite(Number(work.rating)) && work.rating !== null && work.rating !== '' ? Number(work.rating) : null,
+  votes: Number(work.votes) || 0,
+  ratingSum: Number(work.ratingSum) || 0,
+  comments: Array.isArray(work.comments) ? work.comments : []
+}));
 
 const SEED_WORKS = [...new Map(RAW_SEED_WORKS.map(work => [work.title.trim().toLowerCase(), work])).values()].filter(work => !TEST_WORK_IDS.has(work.id));
 
 const defaultState = {
   currentUser: null,
   users: [
-    { username: ADMIN_USERNAME, password: ADMIN_PASSWORD, role: 'admin', favoriteIds: [], featuredCommentIds: [] }
+    { username: ADMIN_USERNAME, password: ADMIN_PASSWORD, role: 'admin', favoriteIds: [], featuredCommentIds: [] },
+    ...IMPORTED_USERNAMES.map(username => ({ username, password: INITIAL_USER_PASSWORD, favoriteIds: [], featuredCommentIds: [] }))
   ],
   works: SEED_WORKS,
   types: DEFAULT_TYPE_OPTIONS,
@@ -56,8 +66,12 @@ function loadState() {
       ...seedWorks.map(seed => savedById.has(seed.id) ? mergeSeedWork(seed, savedById.get(seed.id)) : seed),
       ...savedWorks.filter(work => !seedWorks.some(seed => seed.id === work.id)).map(normalizeWork)
     ];
-    const users = Array.isArray(saved.users) ? saved.users.filter(user => !TEST_USERNAMES.has(user.username)).map(user => ({ ...user, ...(user.username === ADMIN_USERNAME ? { password: ADMIN_PASSWORD, role: 'admin' } : {}), featuredCommentIds: Array.isArray(user.featuredCommentIds) ? user.featuredCommentIds : [] })) : [];
-    if (!users.some(user => user.username === ADMIN_USERNAME)) users.unshift(structuredClone(defaultState.users[0]));
+    const savedUsers = Array.isArray(saved.users) ? saved.users.filter(user => !TEST_USERNAMES.has(user.username)) : [];
+    const users = defaultState.users.map(seedUser => {
+      const savedUser = savedUsers.find(user => user.username === seedUser.username);
+      return { ...structuredClone(seedUser), ...(savedUser || {}), ...(seedUser.username === ADMIN_USERNAME ? { password: ADMIN_PASSWORD, role: 'admin' } : {}), featuredCommentIds: Array.isArray(savedUser?.featuredCommentIds) ? savedUser.featuredCommentIds : [] };
+    });
+    savedUsers.filter(user => !defaultState.users.some(seedUser => seedUser.username === user.username)).forEach(user => users.push({ ...user, featuredCommentIds: Array.isArray(user.featuredCommentIds) ? user.featuredCommentIds : [] }));
     return {
       ...structuredClone(defaultState),
       ...saved,
@@ -82,15 +96,20 @@ function normalizeWork(work) {
   const userRatings = work.userRatings && typeof work.userRatings === 'object' ? work.userRatings : {};
   const ratings = Object.values(userRatings).map(Number).filter(value => Number.isFinite(value));
   const ratingSum = ratings.reduce((sum, value) => sum + value, 0);
-  return { ...work, ratingSum, votes: ratings.length, rating: ratings.length ? ratingSum / ratings.length : 0, comments: Array.isArray(work.comments) ? work.comments.filter(comment => !String(comment.id).startsWith('sheet-comment-')) : [] };
+  return { ...work, ratingSum, votes: ratings.length, rating: ratings.length ? ratingSum / ratings.length : null, comments: Array.isArray(work.comments) ? work.comments.filter(comment => !String(comment.id).startsWith('sheet-comment-')) : [] };
 }
 function mergeSeedWork(seed, saved) {
+  const userRatings = { ...(seed.userRatings || {}), ...((saved.userRatings && typeof saved.userRatings === 'object') ? saved.userRatings : {}) };
+  const seedComments = Array.isArray(seed.comments) ? seed.comments : [];
+  const savedComments = Array.isArray(saved.comments) ? saved.comments : [];
+  const comments = [...seedComments, ...savedComments.filter(comment => !seedComments.some(item => item.id === comment.id))];
   return normalizeWork({
     ...seed,
     ...saved,
     coverImage: saved.coverImage || seed.coverImage,
     poster: saved.poster || seed.poster,
-    comments: Array.isArray(saved.comments) ? saved.comments : seed.comments
+    userRatings,
+    comments
   });
 }
 function currentRoute() { return location.hash.slice(1) || 'home'; }
@@ -99,9 +118,9 @@ function isAdmin(user = currentUser()) { return Boolean(user && (user.role === '
 function userInitial(username = '客') { return username.slice(0, 1).toUpperCase(); }
 function escapeHTML(value = '') { return String(value).replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char])); }
 function safeImage(value = '') { return /^https?:\/\//i.test(value) || /^data:image\/(?:png|jpe?g|gif|webp);base64,/i.test(value) ? value : ''; }
-function formatRating(value) { return Number(value || 0).toFixed(1); }
+function formatRating(value, votes = null) { return votes === 0 || value === null || value === undefined || value === '' ? '—' : Number(value).toFixed(1); }
 function displayYear(year) { return year ? String(year) : '年份待补'; }
-function displayRating(work) { return state.sort === 'score' ? work.rating : Math.min(10, work.rating + (work.votes > 4 ? 1 : 0)); }
+function displayRating(work) { if (!work.votes) return null; return state.sort === 'score' ? work.rating : Math.min(10, work.rating + (work.votes > 4 ? 1 : 0)); }
 function yearBucket(year) {
   if (year <= 1989) return '80年代及以前';
   if (year <= 1999) return '90年代';
@@ -131,11 +150,11 @@ function workCard(work, feature = false) {
   const hotTag = work.votes >= 4 ? '<span class="type-tag hot">热门</span>' : '<span class="type-tag">冷门</span>';
   if (feature) return `<article class="feature-card" data-open-work="${work.id}">
     ${coverMarkup(work)}
-    <div class="feature-info"><strong>${escapeHTML(work.title)}</strong><div class="feature-meta"><span>${displayYear(work.year)} · ${escapeHTML(work.region)}</span><span class="rating">${formatRating(displayRating(work))}</span></div></div>
+    <div class="feature-info"><strong>${escapeHTML(work.title)}</strong><div class="feature-meta"><span>${displayYear(work.year)} · ${escapeHTML(work.region)}</span><span class="rating">${formatRating(displayRating(work), work.votes)}</span></div></div>
   </article>`;
   return `<article class="work-card" data-open-work="${work.id}">
     ${coverMarkup(work)}
-    <div class="feature-info"><strong>${escapeHTML(work.title)}</strong><div class="feature-meta"><span>${displayYear(work.year)} · ${escapeHTML(work.region)}</span><span class="rating">${formatRating(displayRating(work))}</span></div><div class="type-list">${tagHTML}${hotTag}</div></div>
+    <div class="feature-info"><strong>${escapeHTML(work.title)}</strong><div class="feature-meta"><span>${displayYear(work.year)} · ${escapeHTML(work.region)}</span><span class="rating">${formatRating(displayRating(work), work.votes)}</span></div><div class="type-list">${tagHTML}${hotTag}</div></div>
   </article>`;
 }
 
@@ -234,7 +253,7 @@ function renderAdmin() {
   const user = currentUser();
   if (!user || !isAdmin(user)) return `<div class="login-required"><div class="mini-symbol">⌘</div><h2>管理员入口</h2><p>这里可以管理所有作品、类型和封面。请输入管理员账号进入。</p><button class="button button-primary" type="button" data-admin-login>管理员登录</button></div>`;
   const works = [...state.works].sort((a, b) => a.title.localeCompare(b.title, 'zh-CN'));
-  const rows = works.map(work => `<div class="admin-work-row"><div class="admin-work-title"><button class="text-link" type="button" data-open-work="${escapeHTML(work.id)}">${escapeHTML(work.title)}</button><span>${escapeHTML(work.region)} · ${displayYear(work.year)}</span></div><div class="admin-work-types">${work.types.map(type => `<span class="type-tag">${escapeHTML(type)}</span>`).join('') || '<span class="muted">未分类</span>'}</div><div class="admin-work-source">${work.coverImage ? '有封面' : '无封面'} · ${formatRating(work.rating)} 分</div><div class="admin-work-actions"><button class="button button-ghost button-small" type="button" data-edit-work="${escapeHTML(work.id)}">编辑</button><button class="button button-danger button-small" type="button" data-delete-work="${escapeHTML(work.id)}">删除</button></div></div>`).join('');
+  const rows = works.map(work => `<div class="admin-work-row"><div class="admin-work-title"><button class="text-link" type="button" data-open-work="${escapeHTML(work.id)}">${escapeHTML(work.title)}</button><span>${escapeHTML(work.region)} · ${displayYear(work.year)}</span></div><div class="admin-work-types">${work.types.map(type => `<span class="type-tag">${escapeHTML(type)}</span>`).join('') || '<span class="muted">未分类</span>'}</div><div class="admin-work-source">${work.coverImage ? '有封面' : '无封面'} · ${formatRating(work.rating, work.votes)} 分</div><div class="admin-work-actions"><button class="button button-ghost button-small" type="button" data-edit-work="${escapeHTML(work.id)}">编辑</button><button class="button button-danger button-small" type="button" data-delete-work="${escapeHTML(work.id)}">删除</button></div></div>`).join('');
   const typeRows = typeOptions().map(type => `<div class="admin-type-row"><span>${escapeHTML(type)}</span><button class="button button-danger button-small" type="button" data-delete-type="${escapeHTML(type)}">删除</button></div>`).join('');
   const accounts = [...state.users].sort((a, b) => a.username.localeCompare(b.username, 'en'));
   const accountRows = accounts.map(account => `<div class="admin-user-row"><span class="admin-user-name">${escapeHTML(account.username)}${isAdmin(account) ? '<small>管理员</small>' : ''}</span><span>${revealUserPasswords ? escapeHTML(String(account.password || '')) : '••••••'}</span><span>${state.works.filter(work => work.createdBy === account.username).length} 部作品</span></div>`).join('');
@@ -249,7 +268,7 @@ function renderDetail(id) {
   const canEdit = user && (user.username === work.createdBy || isAdmin(user));
   const sortedComments = [...work.comments].sort((a, b) => b.likes - a.likes || b.text.length - a.text.length);
   const ratingButtons = Array.from({ length: 21 }, (_, i) => i / 2).map(score => `<button class="rating-option ${selectedRating === score ? 'is-selected' : ''}" type="button" data-rating="${score}">${score % 1 ? score.toFixed(1) : score}</button>`).join('');
-  return `<a class="back-link" href="#home">← 返回发现</a><section class="detail-hero"><div class="detail-cover">${coverMarkup(work)}</div><div class="detail-copy"><div class="eyebrow">Work / ${escapeHTML(work.region)}</div><h1>${escapeHTML(work.title)}</h1><div class="detail-meta"><span>${displayYear(work.year)}</span><span>${escapeHTML(work.region)}</span>${work.types.map(type => `<span>${escapeHTML(type)}</span>`).join('')}</div><p class="detail-summary">${escapeHTML(work.summary || '这部作品还没有一句介绍，等你来补充。')}</p><div class="detail-score"><strong>${formatRating(work.rating)}</strong><span>真实评分<br />${work.votes} 人参与</span></div><div class="detail-actions"><button class="button ${favorite ? 'button-coral' : 'button-ghost'} button-small" type="button" data-favorite="${work.id}">${favorite ? '♥ 已收藏' : '♡ 收藏到我的罗瓣'}</button>${canEdit ? `<button class="button button-ghost button-small" type="button" data-edit-work="${work.id}">编辑作品</button>` : ''}${isAdmin(user) ? `<button class="button button-danger button-small" type="button" data-delete-work="${work.id}">删除作品</button>` : ''}</div></div></section><section class="detail-columns"><div><section class="detail-section"><h2>留下你的分数</h2><div class="rating-box"><p>从 0 到 10，每次半分都算数。${user ? '' : '登录后即可评分。'}</p><div class="rating-options">${ratingButtons}</div><div style="margin-top:13px"><button class="button button-primary button-small" type="button" data-submit-rating="${work.id}">提交评分</button></div></div></section><section class="detail-section"><h2>评论 <span class="result-count">${work.comments.length}</span></h2>${user ? `<form class="comment-form" id="commentForm" data-work-id="${work.id}"><textarea name="text" required placeholder="说说你为什么记住它……"></textarea><div style="display:flex;justify-content:flex-end"><button class="button button-primary button-small" type="submit">发布评论</button></div></form>` : loginRequired('想留下一句话吗？', '登录后可以评分、评论，也能给别人的评论点个赞。')}<div class="detail-comment-list">${sortedComments.length ? sortedComments.map(comment => `<article class="detail-comment"><div class="detail-comment-top"><button class="comment-author" type="button" data-open-profile="${escapeHTML(comment.user)}">${userInitial(comment.user)} ${escapeHTML(comment.user)}</button><span class="comment-date">${escapeHTML(comment.date)}</span></div><p>${escapeHTML(comment.text)}</p><button class="like-button ${user && comment.likedBy?.includes(user.username) ? 'is-liked' : ''}" type="button" data-like-comment="${work.id}" data-comment-id="${comment.id}">♥ ${comment.likes}</button></article>`).join('') : '<div class="empty-state">还没有评论，来做第一个说话的人。</div>'}</div></section></div><aside><section class="detail-section"><h2>作品信息</h2><div class="info-list"><div class="info-row"><span>类型</span><span>${work.types.map(escapeHTML).join(' / ')}</span></div><div class="info-row"><span>地区</span><span>${escapeHTML(work.region)}</span></div><div class="info-row"><span>年份</span><span>${displayYear(work.year)}</span></div><div class="info-row"><span>创建者</span><span><button class="text-link" type="button" data-open-profile="${escapeHTML(work.createdBy)}">${escapeHTML(work.createdBy)}</button></span></div>${work.sourceUrl ? `<div class="info-row"><span>资料来源</span><a class="text-link" href="${escapeHTML(work.sourceUrl)}" target="_blank" rel="noopener">Bangumi</a></div>` : ''}${work.sourceLabel ? `<div class="info-row"><span>资料来源</span><span>${escapeHTML(work.sourceLabel)}</span></div>` : ''}<div class="info-row"><span>自动标签</span><span>${autoTags(work).join(' / ')}</span></div></div></section><section class="detail-section"><h2>也许你会喜欢</h2><div class="comment-list">${state.works.filter(item => item.id !== work.id && item.types.some(type => work.types.includes(type))).slice(0, 3).map(item => `<button class="button button-ghost" style="justify-content:space-between" type="button" data-open-work="${item.id}"><span>${escapeHTML(item.title)}</span><span class="rating">${formatRating(item.rating)}</span></button>`).join('')}</div></section></aside></section>`;
+  return `<a class="back-link" href="#home">← 返回发现</a><section class="detail-hero"><div class="detail-cover">${coverMarkup(work)}</div><div class="detail-copy"><div class="eyebrow">Work / ${escapeHTML(work.region)}</div><h1>${escapeHTML(work.title)}</h1><div class="detail-meta"><span>${displayYear(work.year)}</span><span>${escapeHTML(work.region)}</span>${work.types.map(type => `<span>${escapeHTML(type)}</span>`).join('')}</div><p class="detail-summary">${escapeHTML(work.summary || '这部作品还没有一句介绍，等你来补充。')}</p><div class="detail-score"><strong>${formatRating(work.rating, work.votes)}</strong><span>真实评分<br />${work.votes} 人参与</span></div><div class="detail-actions"><button class="button ${favorite ? 'button-coral' : 'button-ghost'} button-small" type="button" data-favorite="${work.id}">${favorite ? '♥ 已收藏' : '♡ 收藏到我的罗瓣'}</button>${canEdit ? `<button class="button button-ghost button-small" type="button" data-edit-work="${work.id}">编辑作品</button>` : ''}${isAdmin(user) ? `<button class="button button-danger button-small" type="button" data-delete-work="${work.id}">删除作品</button>` : ''}</div></div></section><section class="detail-columns"><div><section class="detail-section"><h2>留下你的分数</h2><div class="rating-box"><p>从 0 到 10，每次半分都算数。${user ? '' : '登录后即可评分。'}</p><div class="rating-options">${ratingButtons}</div><div style="margin-top:13px"><button class="button button-primary button-small" type="button" data-submit-rating="${work.id}">提交评分</button></div></div></section><section class="detail-section"><h2>评论 <span class="result-count">${work.comments.length}</span></h2>${user ? `<form class="comment-form" id="commentForm" data-work-id="${work.id}"><textarea name="text" required placeholder="说说你为什么记住它……"></textarea><div style="display:flex;justify-content:flex-end"><button class="button button-primary button-small" type="submit">发布评论</button></div></form>` : loginRequired('想留下一句话吗？', '登录后可以评分、评论，也能给别人的评论点个赞。')}<div class="detail-comment-list">${sortedComments.length ? sortedComments.map(comment => `<article class="detail-comment"><div class="detail-comment-top"><button class="comment-author" type="button" data-open-profile="${escapeHTML(comment.user)}">${userInitial(comment.user)} ${escapeHTML(comment.user)}</button><span class="comment-date">${escapeHTML(comment.date)}</span></div><p>${escapeHTML(comment.text)}</p><button class="like-button ${user && comment.likedBy?.includes(user.username) ? 'is-liked' : ''}" type="button" data-like-comment="${work.id}" data-comment-id="${comment.id}">♥ ${comment.likes}</button>${isAdmin(user) ? `<button class="button button-danger button-small comment-delete" type="button" data-delete-comment="${work.id}" data-comment-id="${comment.id}">删除评论</button>` : ''}</article>`).join('') : '<div class="empty-state">还没有评论，来做第一个说话的人。</div>'}</div></section></div><aside><section class="detail-section"><h2>作品信息</h2><div class="info-list"><div class="info-row"><span>类型</span><span>${work.types.map(escapeHTML).join(' / ')}</span></div><div class="info-row"><span>地区</span><span>${escapeHTML(work.region)}</span></div><div class="info-row"><span>年份</span><span>${displayYear(work.year)}</span></div><div class="info-row"><span>创建者</span><span><button class="text-link" type="button" data-open-profile="${escapeHTML(work.createdBy)}">${escapeHTML(work.createdBy)}</button></span></div>${work.sourceUrl ? `<div class="info-row"><span>资料来源</span><a class="text-link" href="${escapeHTML(work.sourceUrl)}" target="_blank" rel="noopener">Bangumi</a></div>` : ''}${work.sourceLabel ? `<div class="info-row"><span>资料来源</span><span>${escapeHTML(work.sourceLabel)}</span></div>` : ''}<div class="info-row"><span>自动标签</span><span>${autoTags(work).join(' / ')}</span></div></div></section><section class="detail-section"><h2>也许你会喜欢</h2><div class="comment-list">${state.works.filter(item => item.id !== work.id && item.types.some(type => work.types.includes(type))).slice(0, 3).map(item => `<button class="button button-ghost" style="justify-content:space-between" type="button" data-open-work="${item.id}"><span>${escapeHTML(item.title)}</span><span class="rating">${formatRating(item.rating, item.votes)}</span></button>`).join('')}</div></section></aside></section>`;
 }
 
 function autoTags(work) {
@@ -340,6 +359,17 @@ function deleteTypeByName(type) {
   saveState(); renderApp(); showToast(`类型“${type}”已删除`);
 }
 
+function deleteComment(workId, commentId) {
+  if (!isAdmin()) { openAuth('admin'); return; }
+  const work = getWork(workId);
+  if (!work) return;
+  const comment = work.comments.find(item => item.id === commentId);
+  if (!comment) return;
+  if (!window.confirm('删除这条评论？')) return;
+  work.comments = work.comments.filter(item => item.id !== commentId);
+  saveState(); renderApp(); showToast('评论已删除');
+}
+
 document.addEventListener('click', event => {
   const target = event.target;
   const openWork = target.closest('[data-open-work]');
@@ -353,6 +383,7 @@ document.addEventListener('click', event => {
   if (target.closest('[data-close-modal]') || target.id === 'modalBackdrop') { closeModal(); return; }
   const deleteWork = target.closest('[data-delete-work]'); if (deleteWork) { deleteWorkById(deleteWork.dataset.deleteWork); return; }
   const deleteType = target.closest('[data-delete-type]'); if (deleteType) { deleteTypeByName(deleteType.dataset.deleteType); return; }
+  const deleteCommentButton = target.closest('[data-delete-comment]'); if (deleteCommentButton) { deleteComment(deleteCommentButton.dataset.deleteComment, deleteCommentButton.dataset.commentId); return; }
   const authTab = target.closest('[data-auth-tab]');
   if (authTab) { openAuth(authTab.dataset.authTab); return; }
   const filterType = target.closest('[data-filter-type]'); if (filterType) { updateFilter('type', filterType.dataset.filterType); return; }
@@ -407,7 +438,7 @@ document.addEventListener('submit', event => {
       revealUserPasswords = false;
       state.currentUser = username; saveState(); closeModal(); renderApp(); showToast(`欢迎回来，${username}`);
     } else {
-      if (!/^[A-Za-z][A-Za-z0-9_-]{1,19}$/.test(username)) { error.textContent = '用户名请使用 2-20 位英文、数字、下划线或短横线。'; return; }
+      if (!/^\S{1,20}$/.test(username)) { error.textContent = '用户名请使用 1-20 个不含空格的字符。'; return; }
       if (getUser(username)) { error.textContent = '这个用户名已经被使用了。'; return; }
       if (!password) { error.textContent = '请输入密码。'; return; }
       state.users.push({ username, password, favoriteIds: [] }); state.currentUser = username; saveState(); closeModal(); renderApp(); showToast('账号创建成功，欢迎来到罗瓣');
@@ -432,7 +463,7 @@ document.addEventListener('submit', event => {
     const editId = event.target.dataset.editId;
     const persist = (finalCoverImage) => {
       if (editId) { const work = getWork(editId); Object.assign(work, { title, types, year, region, poster, coverImage: finalCoverImage, summary }); saveState(); navigate(`work-${editId}`); showToast('作品信息已更新'); }
-      else { const id = `work-${Date.now()}`; state.works.unshift({ id, title, types, year, region, poster, coverImage: finalCoverImage, summary, rating: 0, votes: 0, ratingSum: 0, userRatings: {}, createdBy: currentUser().username, comments: [] }); saveState(); refreshFeatured(); navigate(`work-${id}`); showToast('作品已发布'); }
+      else { const id = `work-${Date.now()}`; state.works.unshift({ id, title, types, year, region, poster, coverImage: finalCoverImage, summary, rating: null, votes: 0, ratingSum: 0, userRatings: {}, createdBy: currentUser().username, comments: [] }); saveState(); refreshFeatured(); navigate(`work-${id}`); showToast('作品已发布'); }
     };
     const file = event.target.querySelector('[name="coverFile"]')?.files?.[0];
     if (file) {
@@ -444,7 +475,7 @@ document.addEventListener('submit', event => {
   }
   if (event.target.id === 'profileForm') {
     event.preventDefault(); const form = new FormData(event.target); const newUsername = form.get('username').toString().trim(); const password = form.get('password').toString(); const oldUsername = currentUser().username; const error = document.getElementById('profileError');
-    if (!/^[A-Za-z][A-Za-z0-9_-]{1,19}$/.test(newUsername)) { error.textContent = '用户名请使用 2-20 位英文、数字、下划线或短横线。'; return; }
+    if (!/^\S{1,20}$/.test(newUsername)) { error.textContent = '用户名请使用 1-20 个不含空格的字符。'; return; }
     if (newUsername !== oldUsername && getUser(newUsername)) { error.textContent = '这个用户名已经被使用了。'; return; }
     const favoriteIds = [...event.target.querySelector('[name="favoriteIds"]').selectedOptions].map(option => option.value);
     const featuredCommentIds = [...event.target.querySelector('[name="featuredCommentIds"]').selectedOptions].map(option => option.value);

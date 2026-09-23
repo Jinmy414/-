@@ -41,7 +41,7 @@ const defaultState = {
   types: DEFAULT_TYPE_OPTIONS,
   deletedWorkIds: [],
   query: '',
-  filters: { types: [], regions: [], years: [], scoreMin: 0, scoreMax: 10 },
+  filters: { types: [], regions: [], years: [], rank: '', scoreMin: 0, scoreMax: 10 },
   sort: 'hot'
 };
 
@@ -191,8 +191,9 @@ function renderFilters() {
   const f = state.filters;
   const chip = (kind, value, selected) => `<button class="filter-chip ${selected ? 'is-selected' : ''}" type="button" data-filter-${kind}="${escapeHTML(value)}">${escapeHTML(value)}</button>`;
   const exactYears = Array.from({ length: 16 }, (_, i) => 2010 + i).filter(year => year <= new Date().getFullYear());
+  const rankChip = (value, label) => `<button class="filter-chip rank-chip rank-${value} ${f.rank === value ? 'is-selected' : ''}" type="button" data-filter-rank="${value}">${label}</button>`;
   return `<div class="filter-panel">
-    <div class="filter-row"><span class="filter-label">类型</span><div class="filter-options">${typeOptions().map(value => chip('type', value, f.types.includes(value))).join('')}</div></div>
+    <div class="filter-row"><span class="filter-label">类型</span><div class="filter-options">${typeOptions().map(value => chip('type', value, f.types.includes(value))).join('')}${rankChip('hot', '热门')}${rankChip('cold', '冷门')}</div></div>
     <div class="filter-row"><span class="filter-label">地区</span><div class="filter-options">${REGION_OPTIONS.map(value => chip('region', value, f.regions.includes(value))).join('')}</div></div>
     <div class="filter-row"><span class="filter-label">年代</span><div class="filter-options">${YEAR_OPTIONS.map(value => chip('year', value, f.years.includes(value))).join('')}<select class="select-compact" id="exactYear" aria-label="选择具体年份"><option value="">具体年份</option>${exactYears.map(year => `<option value="${year}" ${f.years.includes(String(year)) ? 'selected' : ''}>${year}</option>`).join('')}</select></div></div>
     <div class="filter-row"><span class="filter-label">评分</span><div class="score-filter score-range"><input id="scoreMin" type="range" min="0" max="10" step="0.5" value="${f.scoreMin}" aria-label="最低评分" /><input id="scoreMax" type="range" min="0" max="10" step="0.5" value="${f.scoreMax}" aria-label="最高评分" /><span class="score-value">${f.scoreMin === 0 && f.scoreMax === 10 ? '不限评分' : `${f.scoreMin} – ${f.scoreMax} 分`}</span></div></div>
@@ -208,8 +209,9 @@ function filteredWorks() {
     const typeMatch = !f.types.length || f.types.every(type => work.types.includes(type));
     const regionMatch = !f.regions.length || f.regions.every(region => work.region === region);
     const yearMatch = !f.years.length || f.years.every(year => String(work.year) === year || (work.year && yearBucket(work.year) === year));
+    const rankMatch = !f.rank || (f.rank === 'hot' ? work.votes > 4 : work.votes <= 4);
     const scoreMatch = work.rating >= Number(f.scoreMin ?? 0) && work.rating <= Number(f.scoreMax ?? 10);
-    return (!query || searchable.includes(query)) && typeMatch && regionMatch && yearMatch && scoreMatch;
+    return (!query || searchable.includes(query)) && typeMatch && regionMatch && yearMatch && rankMatch && scoreMatch;
   });
   return result.sort((a, b) => state.sort === 'score' ? b.rating - a.rating : state.sort === 'new' ? Number(b.year || 0) - Number(a.year || 0) : (b.votes * b.rating) - (a.votes * a.rating));
 }
@@ -333,6 +335,11 @@ function updateFilter(kind, value) {
   saveState(); renderApp();
 }
 
+function updateRank(value) {
+  state.filters.rank = state.filters.rank === value ? '' : value;
+  saveState(); renderApp();
+}
+
 function deleteWorkById(id) {
   if (!isAdmin()) { openAuth('admin'); return; }
   const work = getWork(id);
@@ -387,10 +394,11 @@ document.addEventListener('click', event => {
   const authTab = target.closest('[data-auth-tab]');
   if (authTab) { openAuth(authTab.dataset.authTab); return; }
   const filterType = target.closest('[data-filter-type]'); if (filterType) { updateFilter('type', filterType.dataset.filterType); return; }
+  const filterRank = target.closest('[data-filter-rank]'); if (filterRank) { updateRank(filterRank.dataset.filterRank); return; }
   const filterRegion = target.closest('[data-filter-region]'); if (filterRegion) { updateFilter('region', filterRegion.dataset.filterRegion); return; }
   const filterYear = target.closest('[data-filter-year]'); if (filterYear) { updateFilter('year', filterYear.dataset.filterYear); return; }
   const sort = target.closest('[data-sort]'); if (sort) { state.sort = sort.dataset.sort; saveState(); renderApp(); return; }
-  if (target.closest('[data-clear-filters]')) { state.query = ''; state.filters = { types: [], regions: [], years: [], scoreMin: 0, scoreMax: 10 }; saveState(); renderApp(); return; }
+  if (target.closest('[data-clear-filters]')) { state.query = ''; state.filters = { types: [], regions: [], years: [], rank: '', scoreMin: 0, scoreMax: 10 }; saveState(); renderApp(); return; }
   const rate = target.closest('[data-rating]'); if (rate) { selectedRating = Number(rate.dataset.rating); document.querySelectorAll('[data-rating]').forEach(button => button.classList.toggle('is-selected', Number(button.dataset.rating) === selectedRating)); return; }
   const submitRating = target.closest('[data-submit-rating]');
   if (submitRating) {

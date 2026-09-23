@@ -138,6 +138,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .filter-chip { border: 0; border-radius: 2px; padding: 4px 8px; color: var(--blue); background: transparent; font-size: 12px; }
 .filter-chip:hover { background: #edf6f0; }
 .filter-chip.is-selected { color: white; background: var(--green); }
+.rank-chip { padding-inline: 10px; font-weight: 700; }
+.rank-chip.rank-hot { color: #b56d1d; background: #fff4df; }
+.rank-chip.rank-hot:hover { background: #ffebc4; }
+.rank-chip.rank-hot.is-selected { color: white; background: #c77a21; }
+.rank-chip.rank-cold { color: #54758a; background: #edf4f8; }
+.rank-chip.rank-cold:hover { background: #dfeef5; }
+.rank-chip.rank-cold.is-selected { color: white; background: #54758a; }
 .score-filter { display: flex; align-items: center; gap: 11px; min-width: min(360px, 100%); }
 .score-filter input { flex: 1; accent-color: var(--green); }
 .score-value { min-width: 48px; color: #777; font-size: 12px; }

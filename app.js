@@ -1,6 +1,6 @@
 const STORAGE_KEY = 'luoban-static-v1';
 
-const TYPE_OPTIONS = ['原创', '轻改', '漫改', '游戏改', '游戏', '小说', '特摄', '机战', '异世界', '热血', '奇幻', '玄幻', '科幻', '校园', '搞笑', '日常', '恋爱', '百合', '运动', '智斗', '偶像', '职场', '悬疑', '治愈', '冒险', '剧情', '动作', '历史', '推理', '后宫', '音乐', '犯罪'];
+const TYPE_OPTIONS = ['原创', '动画', '轻改', '漫改', '游戏改', '游戏', '小说', '特摄', '机战', '异世界', '热血', '奇幻', '玄幻', '科幻', '校园', '搞笑', '日常', '恋爱', '百合', '运动', '智斗', '偶像', '职场', '悬疑', '治愈', '冒险', '剧情', '动作', '历史', '推理', '后宫', '音乐', '犯罪'];
 const REGION_OPTIONS = ['中国', '日本', '欧美', '其他'];
 const YEAR_OPTIONS = ['80年代及以前', '90年代', '00年代', '10年代', '20年代'];
 const POSTER_OPTIONS = {
@@ -12,7 +12,7 @@ const POSTER_OPTIONS = {
   ink: 'linear-gradient(145deg, #9ab1b2 0%, #4f6869 46%, #1e3036 100%)'
 };
 
-const SEED_WORKS = [...(window.LUOBAN_BANGUMI_WORKS || []),
+const RAW_SEED_WORKS = [...(window.LUOBAN_BANGUMI_WORKS || []), ...(window.LUOBAN_ANIMATION_WORKS || []),
   { id: 'tide-letter', title: '潮汐信使', year: 2024, region: '中国', types: ['原创', '奇幻', '恋爱'], rating: 9.1, votes: 28, ratingSum: 254.8, poster: POSTER_OPTIONS.mint, coverImage: '', summary: '一封寄往未来的信，让两个隔着潮汐的人在一座海边小城里相遇。', createdBy: 'demo', comments: [
     { id: 'c1', user: 'riko', text: '海风、留白和配乐都刚刚好，最后一集看完很久没有说话。', likes: 32, date: '2026-08-21' },
     { id: 'c2', user: 'demo', text: '喜欢它把奇幻写得很轻，像生活里突然亮了一盏灯。', likes: 18, date: '2026-08-23' }
@@ -40,16 +40,18 @@ const SEED_WORKS = [...(window.LUOBAN_BANGUMI_WORKS || []),
   { id: 'night-orbit', title: '夜航轨道', year: 2011, region: '欧美', types: ['机战', '原创', '热血'], rating: 8.2, votes: 7, ratingSum: 57.4, poster: POSTER_OPTIONS.dusk, coverImage: '', summary: '在城市熄灯之后，夜航员们守护着一条看不见的轨道。', createdBy: 'riko', comments: [] }
 ];
 
+const SEED_WORKS = [...new Map(RAW_SEED_WORKS.map(work => [work.title.trim().toLowerCase(), work])).values()];
+
 const defaultState = {
   currentUser: null,
   users: [
-    { username: 'demo', password: 'luoban', favoriteIds: ['tide-letter', 'zero-garden', 'mountain-shop'] },
+    { username: 'demo', password: 'luoban', role: 'admin', favoriteIds: ['tide-letter', 'zero-garden', 'mountain-shop'], featuredCommentIds: [] },
     { username: 'riko', password: 'riko', favoriteIds: ['summer-radio', 'moon-post'] },
     { username: 'mulberry', password: 'mulberry', favoriteIds: ['mist-island', 'orange-lab'] }
   ],
   works: SEED_WORKS,
   query: '',
-  filters: { types: [], regions: [], years: [], score: 0 },
+  filters: { types: [], regions: [], years: [], scoreMin: 0, scoreMax: 10 },
   sort: 'hot'
 };
 
@@ -74,8 +76,8 @@ function loadState() {
     return {
       ...structuredClone(defaultState),
       ...saved,
-      filters: { ...defaultState.filters, ...(saved.filters || {}) },
-      users: Array.isArray(saved.users) ? saved.users : defaultState.users,
+      filters: { ...defaultState.filters, ...(saved.filters || {}), scoreMin: saved.filters?.scoreMin ?? saved.filters?.score ?? 0, scoreMax: saved.filters?.scoreMax ?? 10 },
+      users: Array.isArray(saved.users) ? saved.users.map(user => ({ ...user, role: user.username === 'demo' ? 'admin' : user.role, featuredCommentIds: Array.isArray(user.featuredCommentIds) ? user.featuredCommentIds : [] })) : defaultState.users,
       works: mergedWorks.length ? mergedWorks : seedWorks
     };
   } catch { return structuredClone(defaultState); }
@@ -86,10 +88,12 @@ function getWork(id) { return state.works.find(work => work.id === id); }
 function getUser(username) { return state.users.find(user => user.username === username); }
 function currentRoute() { return location.hash.slice(1) || 'home'; }
 function currentUser() { return state.currentUser ? getUser(state.currentUser) : null; }
+function isAdmin(user = currentUser()) { return Boolean(user && (user.role === 'admin' || user.username === 'admin' || user.username.toLowerCase() === 'jinmy414')); }
 function userInitial(username = '客') { return username.slice(0, 1).toUpperCase(); }
 function escapeHTML(value = '') { return String(value).replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char])); }
 function safeImage(value = '') { return /^https?:\/\//i.test(value) ? value : ''; }
 function formatRating(value) { return Number(value || 0).toFixed(1); }
+function displayYear(year) { return year ? String(year) : '年份待补'; }
 function displayRating(work) { return state.sort === 'score' ? work.rating : Math.min(10, work.rating + (work.votes > 4 ? 1 : 0)); }
 function yearBucket(year) {
   if (year <= 1989) return '80年代及以前';
@@ -120,11 +124,11 @@ function workCard(work, feature = false) {
   const hotTag = work.votes >= 4 ? '<span class="type-tag hot">热门</span>' : '<span class="type-tag">冷门</span>';
   if (feature) return `<article class="feature-card" data-open-work="${work.id}">
     ${coverMarkup(work)}
-    <div class="feature-info"><strong>${escapeHTML(work.title)}</strong><div class="feature-meta"><span>${work.year} · ${escapeHTML(work.region)}</span><span class="rating">${formatRating(displayRating(work))}</span></div></div>
+    <div class="feature-info"><strong>${escapeHTML(work.title)}</strong><div class="feature-meta"><span>${displayYear(work.year)} · ${escapeHTML(work.region)}</span><span class="rating">${formatRating(displayRating(work))}</span></div></div>
   </article>`;
   return `<article class="work-card" data-open-work="${work.id}">
     ${coverMarkup(work)}
-    <div class="feature-info"><strong>${escapeHTML(work.title)}</strong><div class="feature-meta"><span>${work.year} · ${escapeHTML(work.region)}</span><span class="rating">${formatRating(displayRating(work))}</span></div><div class="type-list">${tagHTML}${hotTag}</div></div>
+    <div class="feature-info"><strong>${escapeHTML(work.title)}</strong><div class="feature-meta"><span>${displayYear(work.year)} · ${escapeHTML(work.region)}</span><span class="rating">${formatRating(displayRating(work))}</span></div><div class="type-list">${tagHTML}${hotTag}</div></div>
   </article>`;
 }
 
@@ -144,9 +148,11 @@ function renderHome() {
   const filtered = filteredWorks();
   const popular = featuredPopularIds.map(getWork).filter(Boolean);
   const niche = featuredNicheIds.map(getWork).filter(Boolean);
+  const quotes = shuffle(window.LUOBAN_QUOTES || []).slice(0, 2);
+  const quoteMarkup = quotes.length ? quotes.map(item => `<article class="quote-entry"><blockquote>“${escapeHTML(item.quote)}”</blockquote><cite>——《${escapeHTML(item.work)}》</cite></article>`).join('') : '<p class="quote-empty">台词档案正在整理中。</p>';
   return `<section class="hero">
     <div class="hero-copy"><div class="hero-rail"><span class="hero-seal">罗瓣</span><span>作品档案 · 2026</span></div><h1>把喜欢的作品，<br /><em>安放在潮汐里。</em></h1><p class="hero-intro">一座给动画、电影、书和游戏的安静档案馆。搜索一部作品，也搜索别人记住它的理由。</p><div class="hero-actions"><button class="button button-primary" type="button" data-scroll="discover">开始发现 <span>↘</span></button><button class="button button-ghost" type="button" data-open-create>放进一部作品</button></div><div class="hero-stats"><div class="stat"><strong>${state.works.length}</strong><span>正在被记录的作品</span></div><div class="stat"><strong>${state.works.reduce((sum, work) => sum + work.comments.length, 0)}</strong><span>留下的片段</span></div><div class="stat"><strong>0.5</strong><span>评分最小刻度</span></div></div></div>
-    <div class="hero-art"><span class="art-label">LUOBAN / ARCHIVE 01</span><div class="art-orbit art-orbit-one"></div><div class="art-orbit art-orbit-two"></div><div class="art-logo-frame"><img src="assets/logo-snail.png" alt="罗瓣 logo" /></div><span class="art-caption">见喜欢，见自己</span><span class="art-note">a quiet archive<br />for loud feelings</span></div>
+    <div class="hero-art quote-board"><span class="art-label">LUOBAN / 台词档案</span><div class="quote-logo"><img src="assets/logo-snail.png" alt="罗瓣 logo" /></div><div class="quote-list">${quoteMarkup}</div><span class="art-note">随机抽取 · ${quotes.length || 0} 条</span></div>
   </section>
   <section id="discover" class="discover-section"><div class="section-heading"><div><span class="section-index">01 / 今日记录</span><h2>先从一部作品开始</h2><p>每次打开，遇见 3 部热门高分和 3 部冷门高分作品。</p></div><span class="text-link section-date">随机漫游中 · ${new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })}</span></div>
     <div class="split-heading"><h2>热门高分</h2><span class="tag">评分人数 &gt; 4</span><span class="line"></span></div><div class="feature-grid">${popular.length ? popular.map(work => workCard(work, true)).join('') : '<div class="empty-state">还没有足够的热门高分作品。</div>'}</div>
@@ -163,7 +169,7 @@ function renderFilters() {
     <div class="filter-row"><span class="filter-label">类型</span><div class="filter-options">${TYPE_OPTIONS.map(value => chip('type', value, f.types.includes(value))).join('')}</div></div>
     <div class="filter-row"><span class="filter-label">地区</span><div class="filter-options">${REGION_OPTIONS.map(value => chip('region', value, f.regions.includes(value))).join('')}</div></div>
     <div class="filter-row"><span class="filter-label">年代</span><div class="filter-options">${YEAR_OPTIONS.map(value => chip('year', value, f.years.includes(value))).join('')}<select class="select-compact" id="exactYear" aria-label="选择具体年份"><option value="">具体年份</option>${exactYears.map(year => `<option value="${year}" ${f.years.includes(String(year)) ? 'selected' : ''}>${year}</option>`).join('')}</select></div></div>
-    <div class="filter-row"><span class="filter-label">评分</span><div class="score-filter"><input id="scoreRange" type="range" min="0" max="10" step="0.5" value="${f.score}" aria-label="最低评分" /><span class="score-value">${f.score ? `${f.score} 分以上` : '不限评分'}</span></div></div>
+    <div class="filter-row"><span class="filter-label">评分</span><div class="score-filter score-range"><input id="scoreMin" type="range" min="0" max="10" step="0.5" value="${f.scoreMin}" aria-label="最低评分" /><input id="scoreMax" type="range" min="0" max="10" step="0.5" value="${f.scoreMax}" aria-label="最高评分" /><span class="score-value">${f.scoreMin === 0 && f.scoreMax === 10 ? '不限评分' : `${f.scoreMin} – ${f.scoreMax} 分`}</span></div></div>
     <div class="sort-bar"><div class="sort-tabs"><button class="sort-tab ${state.sort === 'hot' ? 'is-selected' : ''}" type="button" data-sort="hot">热门优先</button><button class="sort-tab ${state.sort === 'score' ? 'is-selected' : ''}" type="button" data-sort="score">高分优先</button><button class="sort-tab ${state.sort === 'new' ? 'is-selected' : ''}" type="button" data-sort="new">最新加入</button></div><span class="result-count">${filteredWorks().length} 部作品 · ${state.sort === 'score' ? '按真实评分' : '热门作品展示分 +1'}</span></div>
   </div>`;
 }
@@ -173,35 +179,41 @@ function filteredWorks() {
   const query = state.query.trim().toLowerCase();
   const result = state.works.filter(work => {
     const searchable = [work.title, work.region, ...work.types].join(' ').toLowerCase();
-    const typeMatch = !f.types.length || f.types.some(type => work.types.includes(type));
-    const regionMatch = !f.regions.length || f.regions.includes(work.region);
-    const yearMatch = !f.years.length || f.years.some(year => String(work.year) === year || yearBucket(work.year) === year);
-    const scoreMatch = !f.score || work.rating >= Number(f.score);
+    const typeMatch = !f.types.length || f.types.every(type => work.types.includes(type));
+    const regionMatch = !f.regions.length || f.regions.every(region => work.region === region);
+    const yearMatch = !f.years.length || f.years.every(year => String(work.year) === year || (work.year && yearBucket(work.year) === year));
+    const scoreMatch = work.rating >= Number(f.scoreMin ?? 0) && work.rating <= Number(f.scoreMax ?? 10);
     return (!query || searchable.includes(query)) && typeMatch && regionMatch && yearMatch && scoreMatch;
   });
-  return result.sort((a, b) => state.sort === 'score' ? b.rating - a.rating : state.sort === 'new' ? b.year - a.year : (b.votes * b.rating) - (a.votes * a.rating));
+  return result.sort((a, b) => state.sort === 'score' ? b.rating - a.rating : state.sort === 'new' ? Number(b.year || 0) - Number(a.year || 0) : (b.votes * b.rating) - (a.votes * a.rating));
 }
 
 function renderProfile(username = state.currentUser) {
-  const user = getUser(username) || { username, favoriteIds: [] };
+  const user = getUser(username) || { username, favoriteIds: [], featuredCommentIds: [] };
   const own = currentUser()?.username === username;
   const favorites = (user.favoriteIds || []).map(getWork).filter(Boolean).slice(0, 3);
-  const comments = state.works.flatMap(work => work.comments.map(comment => ({ ...comment, work }))).filter(item => item.user === username).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 3);
+  const allComments = state.works.flatMap(work => work.comments.map(comment => ({ ...comment, work, key: `${work.id}:${comment.id}` }))).filter(item => item.user === username).sort((a, b) => b.date.localeCompare(a.date));
+  const selectedCommentIds = user.featuredCommentIds || [];
+  const comments = allComments.filter(item => selectedCommentIds.includes(item.key)).slice(0, 3);
   const created = state.works.filter(work => work.createdBy === username);
-  return `<section class="page-intro"><div class="eyebrow">Profile / ${escapeHTML(username)}</div><h1>${own ? '我的罗瓣' : `${escapeHTML(username)} 的罗瓣`}</h1><p>${own ? '把最喜欢的三部作品和最近留下的话，整理成一张小小的名片。' : '看看这个人最近喜欢什么，也许会发现同一片海。'}</p></section>
+  return `<section class="page-intro"><div class="eyebrow">Profile / ${escapeHTML(username)}</div><h1>${own ? '我的罗瓣' : `${escapeHTML(username)} 的罗瓣`}</h1><p>${own ? '自己选择三部最爱作品和最多三条展示评论，整理成一张小小的名片。' : '看看这个人最近喜欢什么，也许会发现同一片海。'}</p></section>
     <div class="profile-layout"><aside class="profile-aside"><div class="profile-avatar">${userInitial(username)}</div><h2>${escapeHTML(username)}</h2><div class="profile-handle">@${escapeHTML(username)} · ${own ? '这是你的主页' : '罗瓣用户'}</div><div class="profile-stats"><div class="profile-stat"><strong>${favorites.length}</strong><span>最爱作品</span></div><div class="profile-stat"><strong>${comments.length}</strong><span>展示评论</span></div><div class="profile-stat"><strong>${created.length}</strong><span>创建作品</span></div><div class="profile-stat"><strong>${state.works.reduce((sum, work) => sum + work.comments.filter(comment => comment.user === username).reduce((n, comment) => n + comment.likes, 0), 0)}</strong><span>收到赞</span></div></div>${own ? '<button class="button button-ghost button-wide" type="button" data-toggle-settings style="margin-top:20px">编辑个人信息</button>' : ''}</aside>
-      <div class="profile-main"><section class="profile-section"><h3>三部最爱</h3><div class="favorite-grid">${favorites.length ? favorites.map(work => workCard(work, true)).join('') : '<div class="empty-state">还没有收藏作品。</div>'}</div></section><section class="profile-section"><h3>最近留下的三句话</h3><div class="comment-list">${comments.length ? comments.map(item => `<article class="comment-preview"><div class="comment-preview-top"><span>评论了 <button class="text-link" type="button" data-open-work="${item.work.id}">${escapeHTML(item.work.title)}</button></span><span>${escapeHTML(item.date)} · 赞 ${item.likes}</span></div><p>${escapeHTML(item.text)}</p></article>`).join('') : '<div class="empty-state">还没有公开评论。</div>'}</div></section>${own ? renderProfileSettings(user) : ''}</div></div>`;
+      <div class="profile-main"><section class="profile-section"><h3>三部最爱</h3><div class="favorite-grid">${favorites.length ? favorites.map(work => workCard(work, true)).join('') : '<div class="empty-state">还没有选择最爱作品。</div>'}</div></section><section class="profile-section"><h3>展示评论</h3><div class="comment-list">${comments.length ? comments.map(item => `<article class="comment-preview"><div class="comment-preview-top"><span>评论了 <button class="text-link" type="button" data-open-work="${item.work.id}">${escapeHTML(item.work.title)}</button></span><span>${escapeHTML(item.date)} · 赞 ${item.likes}</span></div><p>${escapeHTML(item.text)}</p></article>`).join('') : '<div class="empty-state">还没有选择要展示的评论。</div>'}</div></section>${own ? renderProfileSettings(user) : ''}</div></div>`;
 }
 
 function renderProfileSettings(user) {
-  return `<section class="profile-section is-hidden" id="profileSettings"><h3>个人信息</h3><form class="editor-card editor-grid" id="profileForm"><label>用户名<input name="username" value="${escapeHTML(user.username)}" autocomplete="username" required /></label><label>新密码<input name="password" type="password" placeholder="留空则不修改" autocomplete="new-password" /></label><div class="form-actions"><span class="form-error" id="profileError"></span><button class="button button-primary" type="submit">保存修改</button></div></form></section>`;
+  const favoriteIds = user.favoriteIds || [];
+  const commentIds = user.featuredCommentIds || [];
+  const favoriteOptions = [...state.works].sort((a, b) => a.title.localeCompare(b.title, 'zh-CN')).map(work => `<option value="${escapeHTML(work.id)}" ${favoriteIds.includes(work.id) ? 'selected' : ''}>${escapeHTML(work.title)}</option>`).join('');
+  const commentOptions = state.works.flatMap(work => work.comments.filter(comment => comment.user === user.username).map(comment => ({ work, comment, key: `${work.id}:${comment.id}` }))).map(item => `<option value="${escapeHTML(item.key)}" ${commentIds.includes(item.key) ? 'selected' : ''}>${escapeHTML(item.work.title)}：${escapeHTML(item.comment.text.slice(0, 46))}</option>`).join('');
+  return `<section class="profile-section is-hidden" id="profileSettings"><h3>个人信息</h3><form class="editor-card editor-grid" id="profileForm"><label>用户名<input name="username" value="${escapeHTML(user.username)}" autocomplete="username" required /></label><label>新密码<input name="password" type="password" placeholder="留空则不修改" autocomplete="new-password" /></label><label>三部最爱 <small class="form-hint">按住 Ctrl / Command 可多选，最多 3 部</small><select name="favoriteIds" multiple size="7">${favoriteOptions}</select></label><label>展示评论 <small class="form-hint">最多选择 3 条</small><select name="featuredCommentIds" multiple size="7">${commentOptions || '<option disabled>还没有发布过评论</option>'}</select></label><div class="form-actions"><span class="form-error" id="profileError"></span><button class="button button-primary" type="submit">保存修改</button></div></form></section>`;
 }
 
 function renderEditor(editId = '') {
   const user = currentUser();
   if (!user) return loginRequired('登录后创建或编辑作品', '拥有账号后，你可以记录自己的作品，也可以继续完善它。');
   const work = editId ? getWork(editId) : null;
-  if (work && work.createdBy !== user.username && user.username !== 'admin') return `<div class="login-required"><div class="mini-symbol">↺</div><h2>这部作品属于 ${escapeHTML(work.createdBy)}</h2><p>只能编辑自己创建的作品，管理员可以编辑所有作品。</p><button class="button button-ghost" type="button" data-back-home>回到发现页</button></div>`;
+  if (work && work.createdBy !== user.username && !isAdmin(user)) return `<div class="login-required"><div class="mini-symbol">↺</div><h2>这部作品属于 ${escapeHTML(work.createdBy)}</h2><p>只能编辑自己创建的作品，管理员可以编辑所有作品。</p><button class="button button-ghost" type="button" data-back-home>回到发现页</button></div>`;
   const selectedTypes = work?.types || ['原创'];
   const posterName = Object.entries(POSTER_OPTIONS).find(([, value]) => value === work?.poster)?.[0] || 'mint';
   return `<section class="page-intro"><div class="eyebrow">Create / Curate</div><h1>${work ? '编辑作品' : '创建一部作品'}</h1><p>${work ? '把信息补充完整，让更多人知道它为什么值得被记住。' : '先留下名字和基本信息，封面和故事都可以以后慢慢补。'}</p></section><div class="editor-shell"><form class="editor-card editor-grid" id="workForm" data-edit-id="${editId}"><label class="full">作品名称<input name="title" value="${escapeHTML(work?.title || '')}" required placeholder="例如：一封寄往未来的信" /></label><label>作品类型<select name="types" multiple size="5" required>${TYPE_OPTIONS.map(type => `<option value="${escapeHTML(type)}" ${selectedTypes.includes(type) ? 'selected' : ''}>${escapeHTML(type)}</option>`).join('')}</select><small class="form-hint">按住 Ctrl / Command 可多选类型</small></label><label>地区<select name="region" required>${REGION_OPTIONS.map(region => `<option value="${region}" ${work?.region === region ? 'selected' : ''}>${region}</option>`).join('')}</select></label><label>年份<input name="year" type="number" min="1900" max="2100" value="${work?.year || new Date().getFullYear()}" required /></label><label>封面风格<select name="poster">${Object.keys(POSTER_OPTIONS).map(key => `<option value="${key}" ${key === posterName ? 'selected' : ''}>${{ mint: '青苔绿', dusk: '晚霞橘', sky: '晴空蓝', lavender: '雾紫色', lemon: '柠檬黄', ink: '墨夜蓝' }[key]}</option>`).join('')}</select></label><label class="full">封面图片地址 <span class="form-hint">可选，使用公开图片 URL</span><input name="coverImage" type="url" value="${escapeHTML(work?.coverImage || '')}" placeholder="https://..." /></label><label class="full">一句话介绍<textarea name="summary" placeholder="用一句话说说它是什么。">${escapeHTML(work?.summary || '')}</textarea></label><div class="form-actions"><button class="button button-ghost" type="button" data-back-home>取消</button><button class="button button-primary" type="submit">${work ? '保存作品' : '发布作品'}</button></div></form></div>`;
@@ -216,10 +228,10 @@ function renderDetail(id) {
   if (!work) return `<div class="empty-state"><strong>找不到这部作品</strong><button class="button button-ghost" type="button" data-back-home>回到发现页</button></div>`;
   const user = currentUser();
   const favorite = user?.favoriteIds?.includes(work.id);
-  const canEdit = user && (user.username === work.createdBy || user.username === 'admin');
+  const canEdit = user && (user.username === work.createdBy || isAdmin(user));
   const sortedComments = [...work.comments].sort((a, b) => b.likes - a.likes || b.text.length - a.text.length);
   const ratingButtons = Array.from({ length: 21 }, (_, i) => i / 2).map(score => `<button class="rating-option ${selectedRating === score ? 'is-selected' : ''}" type="button" data-rating="${score}">${score % 1 ? score.toFixed(1) : score}</button>`).join('');
-  return `<a class="back-link" href="#home">← 返回发现</a><section class="detail-hero"><div class="detail-cover">${coverMarkup(work)}</div><div class="detail-copy"><div class="eyebrow">Work / ${escapeHTML(work.region)}</div><h1>${escapeHTML(work.title)}</h1><div class="detail-meta"><span>${work.year}</span><span>${escapeHTML(work.region)}</span>${work.types.map(type => `<span>${escapeHTML(type)}</span>`).join('')}</div><p class="detail-summary">${escapeHTML(work.summary || '这部作品还没有一句介绍，等你来补充。')}</p><div class="detail-score"><strong>${formatRating(work.rating)}</strong><span>真实评分<br />${work.votes} 人参与</span></div><div class="detail-actions"><button class="button ${favorite ? 'button-coral' : 'button-ghost'} button-small" type="button" data-favorite="${work.id}">${favorite ? '♥ 已收藏' : '♡ 收藏到我的罗瓣'}</button>${canEdit ? `<button class="button button-ghost button-small" type="button" data-edit-work="${work.id}">编辑作品</button>` : ''}</div></div></section><section class="detail-columns"><div><section class="detail-section"><h2>留下你的分数</h2><div class="rating-box"><p>从 0 到 10，每次半分都算数。${user ? '' : '登录后即可评分。'}</p><div class="rating-options">${ratingButtons}</div><div style="margin-top:13px"><button class="button button-primary button-small" type="button" data-submit-rating="${work.id}">提交评分</button></div></div></section><section class="detail-section"><h2>评论 <span class="result-count">${work.comments.length}</span></h2>${user ? `<form class="comment-form" id="commentForm" data-work-id="${work.id}"><textarea name="text" required placeholder="说说你为什么记住它……"></textarea><div style="display:flex;justify-content:flex-end"><button class="button button-primary button-small" type="submit">发布评论</button></div></form>` : loginRequired('想留下一句话吗？', '登录后可以评分、评论，也能给别人的评论点个赞。')}<div class="detail-comment-list">${sortedComments.length ? sortedComments.map(comment => `<article class="detail-comment"><div class="detail-comment-top"><button class="comment-author" type="button" data-open-profile="${escapeHTML(comment.user)}">${userInitial(comment.user)} ${escapeHTML(comment.user)}</button><span class="comment-date">${escapeHTML(comment.date)}</span></div><p>${escapeHTML(comment.text)}</p><button class="like-button ${user && comment.likedBy?.includes(user.username) ? 'is-liked' : ''}" type="button" data-like-comment="${work.id}" data-comment-id="${comment.id}">♥ ${comment.likes}</button></article>`).join('') : '<div class="empty-state">还没有评论，来做第一个说话的人。</div>'}</div></section></div><aside><section class="detail-section"><h2>作品信息</h2><div class="info-list"><div class="info-row"><span>类型</span><span>${work.types.map(escapeHTML).join(' / ')}</span></div><div class="info-row"><span>地区</span><span>${escapeHTML(work.region)}</span></div><div class="info-row"><span>年份</span><span>${work.year}</span></div><div class="info-row"><span>创建者</span><span><button class="text-link" type="button" data-open-profile="${escapeHTML(work.createdBy)}">${escapeHTML(work.createdBy)}</button></span></div>${work.sourceUrl ? `<div class="info-row"><span>资料来源</span><a class="text-link" href="${escapeHTML(work.sourceUrl)}" target="_blank" rel="noopener">Bangumi</a></div>` : ''}<div class="info-row"><span>自动标签</span><span>${autoTags(work).join(' / ')}</span></div></div></section><section class="detail-section"><h2>也许你会喜欢</h2><div class="comment-list">${state.works.filter(item => item.id !== work.id && item.types.some(type => work.types.includes(type))).slice(0, 3).map(item => `<button class="button button-ghost" style="justify-content:space-between" type="button" data-open-work="${item.id}"><span>${escapeHTML(item.title)}</span><span class="rating">${formatRating(item.rating)}</span></button>`).join('')}</div></section></aside></section>`;
+  return `<a class="back-link" href="#home">← 返回发现</a><section class="detail-hero"><div class="detail-cover">${coverMarkup(work)}</div><div class="detail-copy"><div class="eyebrow">Work / ${escapeHTML(work.region)}</div><h1>${escapeHTML(work.title)}</h1><div class="detail-meta"><span>${displayYear(work.year)}</span><span>${escapeHTML(work.region)}</span>${work.types.map(type => `<span>${escapeHTML(type)}</span>`).join('')}</div><p class="detail-summary">${escapeHTML(work.summary || '这部作品还没有一句介绍，等你来补充。')}</p><div class="detail-score"><strong>${formatRating(work.rating)}</strong><span>真实评分<br />${work.votes} 人参与</span></div><div class="detail-actions"><button class="button ${favorite ? 'button-coral' : 'button-ghost'} button-small" type="button" data-favorite="${work.id}">${favorite ? '♥ 已收藏' : '♡ 收藏到我的罗瓣'}</button>${canEdit ? `<button class="button button-ghost button-small" type="button" data-edit-work="${work.id}">编辑作品</button>` : ''}</div></div></section><section class="detail-columns"><div><section class="detail-section"><h2>留下你的分数</h2><div class="rating-box"><p>从 0 到 10，每次半分都算数。${user ? '' : '登录后即可评分。'}</p><div class="rating-options">${ratingButtons}</div><div style="margin-top:13px"><button class="button button-primary button-small" type="button" data-submit-rating="${work.id}">提交评分</button></div></div></section><section class="detail-section"><h2>评论 <span class="result-count">${work.comments.length}</span></h2>${user ? `<form class="comment-form" id="commentForm" data-work-id="${work.id}"><textarea name="text" required placeholder="说说你为什么记住它……"></textarea><div style="display:flex;justify-content:flex-end"><button class="button button-primary button-small" type="submit">发布评论</button></div></form>` : loginRequired('想留下一句话吗？', '登录后可以评分、评论，也能给别人的评论点个赞。')}<div class="detail-comment-list">${sortedComments.length ? sortedComments.map(comment => `<article class="detail-comment"><div class="detail-comment-top"><button class="comment-author" type="button" data-open-profile="${escapeHTML(comment.user)}">${userInitial(comment.user)} ${escapeHTML(comment.user)}</button><span class="comment-date">${escapeHTML(comment.date)}</span></div><p>${escapeHTML(comment.text)}</p><button class="like-button ${user && comment.likedBy?.includes(user.username) ? 'is-liked' : ''}" type="button" data-like-comment="${work.id}" data-comment-id="${comment.id}">♥ ${comment.likes}</button></article>`).join('') : '<div class="empty-state">还没有评论，来做第一个说话的人。</div>'}</div></section></div><aside><section class="detail-section"><h2>作品信息</h2><div class="info-list"><div class="info-row"><span>类型</span><span>${work.types.map(escapeHTML).join(' / ')}</span></div><div class="info-row"><span>地区</span><span>${escapeHTML(work.region)}</span></div><div class="info-row"><span>年份</span><span>${displayYear(work.year)}</span></div><div class="info-row"><span>创建者</span><span><button class="text-link" type="button" data-open-profile="${escapeHTML(work.createdBy)}">${escapeHTML(work.createdBy)}</button></span></div>${work.sourceUrl ? `<div class="info-row"><span>资料来源</span><a class="text-link" href="${escapeHTML(work.sourceUrl)}" target="_blank" rel="noopener">Bangumi</a></div>` : ''}${work.sourceLabel ? `<div class="info-row"><span>资料来源</span><span>${escapeHTML(work.sourceLabel)}</span></div>` : ''}<div class="info-row"><span>自动标签</span><span>${autoTags(work).join(' / ')}</span></div></div></section><section class="detail-section"><h2>也许你会喜欢</h2><div class="comment-list">${state.works.filter(item => item.id !== work.id && item.types.some(type => work.types.includes(type))).slice(0, 3).map(item => `<button class="button button-ghost" style="justify-content:space-between" type="button" data-open-work="${item.id}"><span>${escapeHTML(item.title)}</span><span class="rating">${formatRating(item.rating)}</span></button>`).join('')}</div></section></aside></section>`;
 }
 
 function autoTags(work) {
@@ -296,7 +308,7 @@ document.addEventListener('click', event => {
   const filterRegion = target.closest('[data-filter-region]'); if (filterRegion) { updateFilter('region', filterRegion.dataset.filterRegion); return; }
   const filterYear = target.closest('[data-filter-year]'); if (filterYear) { updateFilter('year', filterYear.dataset.filterYear); return; }
   const sort = target.closest('[data-sort]'); if (sort) { state.sort = sort.dataset.sort; saveState(); renderApp(); return; }
-  if (target.closest('[data-clear-filters]')) { state.query = ''; state.filters = { types: [], regions: [], years: [], score: 0 }; saveState(); renderApp(); return; }
+  if (target.closest('[data-clear-filters]')) { state.query = ''; state.filters = { types: [], regions: [], years: [], scoreMin: 0, scoreMax: 10 }; saveState(); renderApp(); return; }
   const rate = target.closest('[data-rating]'); if (rate) { selectedRating = Number(rate.dataset.rating); document.querySelectorAll('[data-rating]').forEach(button => button.classList.toggle('is-selected', Number(button.dataset.rating) === selectedRating)); return; }
   const submitRating = target.closest('[data-submit-rating]');
   if (submitRating) {
@@ -363,13 +375,22 @@ document.addEventListener('submit', event => {
     event.preventDefault(); const form = new FormData(event.target); const newUsername = form.get('username').toString().trim(); const password = form.get('password').toString(); const oldUsername = currentUser().username; const error = document.getElementById('profileError');
     if (!/^[A-Za-z][A-Za-z0-9_-]{1,19}$/.test(newUsername)) { error.textContent = '用户名请使用 2-20 位英文、数字、下划线或短横线。'; return; }
     if (newUsername !== oldUsername && getUser(newUsername)) { error.textContent = '这个用户名已经被使用了。'; return; }
-    const user = currentUser(); user.username = newUsername; if (password) user.password = password; state.works.forEach(work => { if (work.createdBy === oldUsername) work.createdBy = newUsername; work.comments.forEach(comment => { if (comment.user === oldUsername) comment.user = newUsername; }); }); state.currentUser = newUsername; saveState(); renderApp(); showToast('个人信息已更新');
+    const favoriteIds = [...event.target.querySelector('[name="favoriteIds"]').selectedOptions].map(option => option.value);
+    const featuredCommentIds = [...event.target.querySelector('[name="featuredCommentIds"]').selectedOptions].map(option => option.value);
+    if (favoriteIds.length > 3 || featuredCommentIds.length > 3) { error.textContent = '最爱作品和展示评论最多各选 3 项。'; return; }
+    const user = currentUser(); user.username = newUsername; user.favoriteIds = favoriteIds; user.featuredCommentIds = featuredCommentIds; if (password) user.password = password; state.works.forEach(work => { if (work.createdBy === oldUsername) work.createdBy = newUsername; work.comments.forEach(comment => { if (comment.user === oldUsername) comment.user = newUsername; }); }); state.currentUser = newUsername; saveState(); renderApp(); showToast('个人信息已更新');
   }
 });
 
 document.addEventListener('change', event => {
   if (event.target.id === 'exactYear') { const value = event.target.value; if (value && !state.filters.years.includes(value)) state.filters.years.push(value); else if (!value) state.filters.years = state.filters.years.filter(year => !/^\d{4}$/.test(year)); saveState(); renderApp(); }
-  if (event.target.id === 'scoreRange') { state.filters.score = Number(event.target.value); saveState(); renderApp(); }
+  if (event.target.id === 'scoreMin' || event.target.id === 'scoreMax') {
+    const min = event.target.id === 'scoreMin' ? Number(event.target.value) : Number(state.filters.scoreMin ?? 0);
+    const max = event.target.id === 'scoreMax' ? Number(event.target.value) : Number(state.filters.scoreMax ?? 10);
+    state.filters.scoreMin = Math.min(min, max);
+    state.filters.scoreMax = Math.max(min, max);
+    saveState(); renderApp();
+  }
 });
 
 window.addEventListener('hashchange', renderApp);

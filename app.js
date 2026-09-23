@@ -293,7 +293,9 @@ function openAuth(mode = 'login') {
   document.querySelectorAll('[data-auth-tab]').forEach(tab => tab.classList.toggle('is-active', tab.dataset.authTab === authMode));
   document.getElementById('authTitle').textContent = authMode === 'admin' ? '管理员入口' : authMode === 'login' ? '登录后，开始留下你的分数' : '注册一个罗瓣用户名';
   document.getElementById('authSubmit').textContent = authMode === 'admin' ? '进入管理后台' : authMode === 'login' ? '登录罗瓣' : '创建账号';
-  document.getElementById('authHint').textContent = authMode === 'admin' ? '管理员账号：admin · 初始密码：654321' : authMode === 'login' ? '管理员请使用“管理员入口”；普通用户输入自己的账号。' : '用户名需为不重复的英文名称，可含数字、下划线或短横线。';
+  const authHint = document.getElementById('authHint');
+  authHint.textContent = authMode === 'admin' ? '' : authMode === 'login' ? '管理员请使用“管理员入口”；普通用户输入自己的账号。' : '用户名需为不重复的英文名称，可含数字、下划线或短横线。';
+  authHint.classList.toggle('is-hidden', authMode === 'admin');
   document.getElementById('authError').textContent = '';
   document.getElementById('authForm').reset();
   if (authMode === 'admin') document.getElementById('authUsername').value = ADMIN_USERNAME;

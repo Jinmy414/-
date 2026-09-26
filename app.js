@@ -103,10 +103,12 @@ function mergeSeedWork(seed, saved) {
   const seedComments = Array.isArray(seed.comments) ? seed.comments : [];
   const savedComments = Array.isArray(saved.comments) ? saved.comments : [];
   const comments = [...seedComments, ...savedComments.filter(comment => !seedComments.some(item => item.id === comment.id))];
+  const savedCover = String(saved.coverImage || '');
+  const migratedCover = /^https?:\/\/lain\.bgm\.tv\//i.test(savedCover) && String(seed.coverImage || '').startsWith('assets/covers/') ? seed.coverImage : (saved.coverImage || seed.coverImage);
   return normalizeWork({
     ...seed,
     ...saved,
-    coverImage: saved.coverImage || seed.coverImage,
+    coverImage: migratedCover,
     poster: saved.poster || seed.poster,
     userRatings,
     comments
@@ -121,7 +123,7 @@ function workRank(work) { const threshold = popularityThreshold(); if (work.vote
 function popularityThresholdLabel() { const threshold = popularityThreshold(); return Number.isInteger(threshold) ? String(threshold) : threshold.toFixed(1); }
 function userInitial(username = '客') { return username.slice(0, 1).toUpperCase(); }
 function escapeHTML(value = '') { return String(value).replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char])); }
-function safeImage(value = '') { return /^https?:\/\//i.test(value) || /^data:image\/(?:png|jpe?g|gif|webp);base64,/i.test(value) ? value : ''; }
+function safeImage(value = '') { return /^https?:\/\//i.test(value) || /^(?:\.\/)?assets\/covers\//i.test(value) || /^data:image\/(?:png|jpe?g|gif|webp);base64,/i.test(value) ? value : ''; }
 function formatRating(value, votes = null) { return votes === 0 || value === null || value === undefined || value === '' ? '—' : Number(value).toFixed(1); }
 function displayYear(year) { return year ? String(year) : '年份待补'; }
 function displayRating(work) { if (!work.votes) return null; return state.sort === 'score' ? work.rating : Math.min(10, work.rating + (workRank(work) === 'hot' ? 1 : 0)); }
